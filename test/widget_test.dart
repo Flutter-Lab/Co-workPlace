@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:coworkplace/app/app.dart';
+import 'package:coworkplace/app/session/app_session.dart';
+import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/core/bootstrap/bootstrap_provider.dart';
+import 'package:coworkplace/core/bootstrap/bootstrap_state.dart';
+import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:coworkplace/main.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('App shell renders bottom navigation', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appBootstrapProvider.overrideWith(
+            (ref) async => const BootstrapState(firebaseReady: false),
+          ),
+          appSessionProvider.overrideWith(
+            (ref) => Stream.value(
+              AppSession.authenticated(
+                userId: 'test-user',
+                profile: UserProfile(
+                  id: 'test-user',
+                  displayName: 'Tester',
+                  timezone: 'UTC',
+                  dayStartHour: 4,
+                  groupIds: const ['group-1'],
+                  activeGroupId: 'group-1',
+                ),
+              ),
+            ),
+          ),
+        ],
+        child: const CoworkplaceApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Members'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
   });
 }

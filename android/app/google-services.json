@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1340250550",
+    "firebase_url": "https://flutter-ecommrce-default-rtdb.firebaseio.com",
+    "project_id": "flutter-ecommrce",
+    "storage_bucket": "flutter-ecommrce.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1340250550:android:0a76cf4c3130ebd8b74917",
+        "android_client_info": {
+          "package_name": "com.example.coworkplace"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1340250550-34o55eod840vd3jgdvu968gd3k0pu39c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPsvXy1IlQMZLSCX3sgytDPXYoFxmBQdE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1340250550-34o55eod840vd3jgdvu968gd3k0pu39c.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1340250550-djda5iqm7b6jn2cr68gsrciqk8tmop3i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.mentorHub"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

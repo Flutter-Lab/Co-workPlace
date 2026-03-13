@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Returns true if the requester is signed in (including anonymous auth).
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // Returns true if the requester is a member of the given group.
+    // Uses a get() to read the group document — one extra read per rule check.
+    function isMember(groupId) {
+      return isAuthed() &&
+        request.auth.uid in
+          get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+    }
+
+    // Returns true if requester and target user are in the requester's active group.
+    function sharesActiveGroupWithUser(targetUid) {
+      let requesterRef = /databases/$(database)/documents/users/$(request.auth.uid);
+      let targetRef = /databases/$(database)/documents/users/$(targetUid);
+      return isAuthed()
+        && exists(requesterRef)
+        && exists(targetRef)
+        && get(requesterRef).data.activeGroupId is string
+        && get(targetRef).data.groupIds is list
+        && get(requesterRef).data.activeGroupId in get(targetRef).data.groupIds;
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────────
+    // Users can read their own profile, or another profile if they share a group.
+    // Writes remain self-only.
+    match /users/{uid} {
+      allow read: if isAuthed() && (
+        request.auth.uid == uid ||
+        sharesActiveGroupWithUser(uid)
+      );
+      allow write: if isAuthed() && request.auth.uid == uid;
+    }
+
+    // ── Groups ─────────────────────────────────────────────────────────────────
+    match /groups/{groupId} {
+
+      // Any existing member can read the group document.
+      allow read: if isMember(groupId);
+
+      // An authenticated user can create a group provided they set themselves
+      // as createdBy and include themselves in the initial memberIds list.
+      allow create: if isAuthed()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds;
+
+      // Update is allowed in two cases:
+      //   (a) The requester is already a member and is not changing the
+      //       immutable fields (code, createdBy).
+      //   (b) The requester is not yet a member and is self-joining:
+      //       the only permitted changes are appending request.auth.uid to
+      //       memberIds and updating updatedAtUtc; all other fields must stay
+      //       identical to what is stored.
+      allow update: if isAuthed() && (
+
+        // Case (a): existing member updating group details.
+        (
+          request.auth.uid in resource.data.memberIds &&
+          request.resource.data.code == resource.data.code &&
+          request.resource.data.createdBy == resource.data.createdBy
+        ) ||
+
+        // Case (b): non-member self-join via invite code.
+        (
+          !(request.auth.uid in resource.data.memberIds) &&
+          request.resource.data.memberIds is list &&
+          request.resource.data.memberIds.hasAll(resource.data.memberIds) &&
+          request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1 &&
+          request.auth.uid in request.resource.data.memberIds &&
+          request.resource.data.name      == resource.data.name &&
+          request.resource.data.code      == resource.data.code &&
+          request.resource.data.createdBy == resource.data.createdBy
+        )
+      );
+
+      // Groups are never hard-deleted in the MVP.
+      allow delete: if false;
+
+      // ── Tasks ───────────────────────────────────────────────────────────────
+      match /tasks/{taskId} {
+
+        // Any group member can read tasks (including inactive/archived ones).
+        allow read: if isMember(groupId);
+
+        // Only a group member may create a task, and ownerId must match the
+        // authenticated user — prevents creating tasks on behalf of others.
+        allow create: if isMember(groupId)
+          && request.resource.data.ownerId == request.auth.uid;
+
+        // Only the original task owner (who must still be a group member) may
+        // update. ownerId is treated as immutable: both the stored value and the
+        // incoming value must equal the requester.
+        allow update: if isMember(groupId)
+          && resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == request.auth.uid;
+
+        // The MVP uses a soft-delete via the `active` flag — no hard deletes.
+        allow delete: if false;
+      }
+
+      // ── Completions ─────────────────────────────────────────────────────────
+      match /completions/{completionId} {
+
+        // Any group member may read all completions in the group.
+        // This is required so the Members screen can display each teammate's
+        // progress for their logical day.
+        allow read: if isMember(groupId);
+
+        // Only the completion's owner (userId field == requester) may create or
+        // update a completion record, and they must be a group member.
+        allow create, update: if isMember(groupId)
+          && request.resource.data.userId == request.auth.uid;
+
+        // Completion records are never hard-deleted.
+        allow delete: if false;
+      }
+    }
+  }
+}
