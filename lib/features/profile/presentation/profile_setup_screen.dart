@@ -1,4 +1,5 @@
 import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/features/auth/providers/auth_providers.dart';
 import 'package:coworkplace/features/mode/domain/default_mode_presets.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
@@ -127,6 +128,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _goToLoginOptions() async {
+    try {
+      await ref.read(authRepositoryProvider).signOut();
+    } catch (error) {
+      _showSnack('Failed to open login options: $error');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final modePresets = defaultModePresets;
@@ -136,6 +145,20 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.login),
+              title: const Text('Already have an account?'),
+              subtitle: const Text(
+                'Go to login options and sign in with email/password.',
+              ),
+              trailing: TextButton(
+                onPressed: _goToLoginOptions,
+                child: const Text('Login Options'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _displayNameController,
             textInputAction: TextInputAction.next,

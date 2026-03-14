@@ -69,8 +69,8 @@ class HomeScreen extends ConsumerWidget {
                 future: _packageInfoFuture,
                 builder: (context, snap) {
                   final versionText = snap.hasData
-                      ? 'v${snap.data!.version}+${snap.data!.buildNumber}'
-                      : 'v...';
+                      ? 'v${snap.data!.version}'
+                      : 'v1.0.0';
                   return DecoratedBox(
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surface.withOpacity(0.92),
