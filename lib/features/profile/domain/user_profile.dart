@@ -11,6 +11,8 @@ class UserProfile {
     required this.feedViewMode,
     this.activeGroupId,
     this.currentMode,
+    this.isOnline = false,
+    this.lastSeenAtUtc,
   });
 
   final String id;
@@ -22,6 +24,8 @@ class UserProfile {
   final FeedViewMode feedViewMode;
   final String? activeGroupId;
   final UserCurrentMode? currentMode;
+  final bool isOnline;
+  final DateTime? lastSeenAtUtc;
 
   UserProfile copyWith({
     String? displayName,
@@ -32,8 +36,11 @@ class UserProfile {
     FeedViewMode? feedViewMode,
     String? activeGroupId,
     UserCurrentMode? currentMode,
+    bool? isOnline,
+    DateTime? lastSeenAtUtc,
     bool clearActiveGroupId = false,
     bool clearCurrentMode = false,
+    bool clearLastSeenAtUtc = false,
   }) {
     return UserProfile(
       id: id,
@@ -47,6 +54,10 @@ class UserProfile {
           ? null
           : (activeGroupId ?? this.activeGroupId),
       currentMode: clearCurrentMode ? null : (currentMode ?? this.currentMode),
+      isOnline: isOnline ?? this.isOnline,
+      lastSeenAtUtc: clearLastSeenAtUtc
+          ? null
+          : (lastSeenAtUtc ?? this.lastSeenAtUtc),
     );
   }
 
@@ -61,6 +72,8 @@ class UserProfile {
       'feedViewMode': feedViewMode.name,
       'activeGroupId': activeGroupId,
       'currentMode': currentMode?.toMap(),
+      'isOnline': isOnline,
+      'lastSeenAtUtc': lastSeenAtUtc?.toIso8601String(),
     };
   }
 
@@ -78,6 +91,11 @@ class UserProfile {
     final parsedFeedViewMode = FeedViewMode.values.where((mode) {
       return mode.name == rawFeedViewMode;
     }).firstOrNull ?? FeedViewMode.list;
+    final rawIsOnline = map['isOnline'];
+    final parsedIsOnline = rawIsOnline is bool
+        ? rawIsOnline
+        : (rawIsOnline is num ? rawIsOnline != 0 : false);
+    final rawLastSeenAtUtc = map['lastSeenAtUtc'] as String?;
     final rawUsername = (map['username'] as String?)?.trim();
     final fallbackDisplayName = (map['displayName'] as String?)?.trim() ?? '';
 
@@ -95,6 +113,10 @@ class UserProfile {
       currentMode: map['currentMode'] == null
           ? null
           : UserCurrentMode.fromMap(map['currentMode'] as Map<String, dynamic>),
+        isOnline: parsedIsOnline,
+        lastSeenAtUtc: rawLastSeenAtUtc == null
+          ? null
+          : DateTime.parse(rawLastSeenAtUtc).toUtc(),
     );
   }
 

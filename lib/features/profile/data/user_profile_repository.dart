@@ -31,6 +31,24 @@ class UserProfileRepository {
     return results.whereType<UserProfile>().toList();
   }
 
+  /// Streams live updates for a set of user profiles.
+  /// Uses a single Firestore [whereIn] query (max 30 ids).
+  Stream<List<UserProfile>> watchByIds(Iterable<String> userIds) {
+    final seen = <String>{};
+    final orderedIds = userIds.where(seen.add).toList();
+    if (orderedIds.isEmpty) {
+      return Stream.value([]);
+    }
+    return _users
+        .where(FieldPath.documentId, whereIn: orderedIds)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => UserProfile.fromMap({...doc.data(), 'id': doc.id}))
+              .toList(),
+        );
+  }
+
   Future<UserProfile?> findByUsername(String username) async {
     final normalized = username.trim().toLowerCase();
     if (normalized.isEmpty) {
@@ -48,5 +66,17 @@ class UserProfileRepository {
 
   Future<void> upsert(UserProfile profile) async {
     await _users.doc(profile.id).set(profile.toMap(), SetOptions(merge: true));
+  }
+
+  Future<void> setPresence({
+    required String userId,
+    required bool isOnline,
+    DateTime? seenAtUtc,
+  }) async {
+    final nowUtc = (seenAtUtc ?? DateTime.now().toUtc()).toIso8601String();
+    await _users.doc(userId).set({
+      'isOnline': isOnline,
+      'lastSeenAtUtc': nowUtc,
+    }, SetOptions(merge: true));
   }
 }

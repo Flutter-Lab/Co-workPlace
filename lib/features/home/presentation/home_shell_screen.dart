@@ -1,51 +1,26 @@
-import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/features/friends/presentation/friends_screen.dart';
 import 'package:coworkplace/features/home/presentation/home_screen.dart';
-import 'package:coworkplace/features/mode/domain/default_mode_presets.dart';
 import 'package:coworkplace/features/profile/presentation/personal_profile_screen.dart';
-import 'package:coworkplace/features/profile/domain/user_profile.dart';
-import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class HomeShellScreen extends ConsumerStatefulWidget {
+class HomeShellScreen extends StatefulWidget {
   const HomeShellScreen({super.key});
 
   @override
-  ConsumerState<HomeShellScreen> createState() => _HomeShellScreenState();
+  State<HomeShellScreen> createState() => _HomeShellScreenState();
 }
 
-class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
+class _HomeShellScreenState extends State<HomeShellScreen> {
   int _index = 0;
 
-  static const _pages = [HomeScreen(), FriendsScreen(), SettingsScreen()];
-
-  static const _titles = ['Coworkplace', 'Friends', 'Settings'];
+  static const _titles = ['Coworkplace', 'Friends', 'Settings', 'Profile'];
 
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(appSessionProvider).valueOrNull;
-    final currentModeLabel = session?.profile?.currentMode?.label;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titles[_index]),
-        actions: [
-          if (_index == 0)
-            TextButton.icon(
-              onPressed: () => _editCurrentMode(),
-              icon: const Icon(Icons.mood, size: 18),
-              label: Text(currentModeLabel ?? 'Set Mode'),
-            ),
-          IconButton(
-            tooltip: 'My Profile',
-            onPressed: _openMyProfile,
-            icon: const Icon(Icons.person_outline),
-          ),
-        ],
-      ),
-      body: IndexedStack(index: _index, children: _pages),
+      appBar: _index == 3 ? null : AppBar(title: Text(_titles[_index])),
+      body: _buildPage(_index),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (index) {
@@ -69,153 +44,28 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
       ),
     );
   }
 
-  Future<void> _editCurrentMode() async {
-    final session = ref.read(appSessionProvider).valueOrNull;
-    final profile = session?.profile;
-    if (session?.userId == null || profile == null) {
-      _showSnack('Profile is not ready yet.');
-      return;
-    }
-
-    final modeDetailController = TextEditingController();
-    var selectedPresetId =
-        profile.currentMode?.presetId ?? defaultModePresets.first.id;
-
-    final savedLabel = profile.currentMode?.label;
-    final selectedPreset = defaultModePresets.firstWhere(
-      (preset) => preset.id == selectedPresetId,
-      orElse: () => defaultModePresets.first,
-    );
-
-    if (savedLabel != null && savedLabel.startsWith('${selectedPreset.label} - ')) {
-      modeDetailController.text =
-          savedLabel.substring('${selectedPreset.label} - '.length).trim();
-    }
-
-    final result = await showModalBottomSheet<_ModeDraft>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Update Current Mode', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final preset in defaultModePresets)
-                          ChoiceChip(
-                            label: Text(preset.label),
-                            selected: selectedPresetId == preset.id,
-                            onSelected: (_) {
-                              setModalState(() {
-                                selectedPresetId = preset.id;
-                              });
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: modeDetailController,
-                      decoration: const InputDecoration(
-                        labelText: 'Mode Detail (Optional)',
-                        hintText: 'Add short context',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () {
-                              Navigator.of(context).pop(
-                                _ModeDraft(
-                                  selectedPresetId: selectedPresetId,
-                                  detail: modeDetailController.text.trim(),
-                                ),
-                              );
-                            },
-                            child: const Text('Save Mode'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (result == null) {
-      return;
-    }
-
-    final preset = defaultModePresets.firstWhere((p) => p.id == result.selectedPresetId);
-    final modeLabel = result.detail.isEmpty ? preset.label : '${preset.label} - ${result.detail}';
-
-    final updatedProfile = profile.copyWith(
-      currentMode: UserCurrentMode(
-        label: modeLabel,
-        presetId: preset.id,
-        updatedAtUtc: DateTime.now().toUtc(),
-      ),
-    );
-
-    try {
-      final repository = ref.read(userProfileRepositoryProvider);
-      await repository.upsert(updatedProfile);
-      ref.invalidate(appSessionProvider);
-      if (!mounted) {
-        return;
-      }
-      _showSnack('Current mode updated.');
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      _showSnack('Failed to update mode: $error');
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return const HomeScreen();
+      case 1:
+        return const FriendsScreen();
+      case 2:
+        return const SettingsScreen();
+      case 3:
+        return const PersonalProfileScreen();
+      default:
+        return const HomeScreen();
     }
   }
-
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  void _openMyProfile() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const PersonalProfileScreen(),
-      ),
-    );
-  }
-}
-
-class _ModeDraft {
-  const _ModeDraft({required this.selectedPresetId, required this.detail});
-
-  final String selectedPresetId;
-  final String detail;
 }

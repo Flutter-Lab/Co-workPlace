@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/app/theme/app_theme.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_provider.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_state.dart';
 import 'package:coworkplace/features/auth/presentation/auth_entry_screen.dart';
 import 'package:coworkplace/features/home/presentation/home_shell_screen.dart';
+import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/features/profile/presentation/profile_setup_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,7 +56,10 @@ class _SessionGate extends ConsumerWidget {
             return const ProfileSetupScreen();
           }
 
-          return const HomeShellScreen();
+          return _PresenceHeartbeat(
+            userId: state.userId!,
+            child: const HomeShellScreen(),
+          );
         },
       ),
       builder: (context, child) {
@@ -127,5 +133,102 @@ class _StartupErrorScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _PresenceHeartbeat extends ConsumerStatefulWidget {
+  const _PresenceHeartbeat({required this.userId, required this.child});
+
+  final String userId;
+  final Widget child;
+
+  @override
+  ConsumerState<_PresenceHeartbeat> createState() => _PresenceHeartbeatState();
+}
+
+class _PresenceHeartbeatState extends ConsumerState<_PresenceHeartbeat>
+    with WidgetsBindingObserver {
+  static const _heartbeatInterval = Duration(seconds: 25);
+
+  Timer? _timer;
+  DateTime? _lastHeartbeatUtc;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _setOnlineAndHeartbeat();
+    _timer = Timer.periodic(_heartbeatInterval, (_) {
+      _setOnlineAndHeartbeat();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _PresenceHeartbeat oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId) {
+      _lastHeartbeatUtc = null;
+      _setOnlineAndHeartbeat(force: true);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _setOnlineAndHeartbeat(force: true);
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _setOffline();
+    }
+  }
+
+  Future<void> _setOnlineAndHeartbeat({bool force = false}) async {
+    final now = DateTime.now().toUtc();
+    if (!force && _lastHeartbeatUtc != null) {
+      final elapsed = now.difference(_lastHeartbeatUtc!);
+      if (elapsed < const Duration(seconds: 15)) {
+        return;
+      }
+    }
+
+    _lastHeartbeatUtc = now;
+    try {
+      await ref.read(userProfileRepositoryProvider).setPresence(
+            userId: widget.userId,
+            isOnline: true,
+            seenAtUtc: now,
+          );
+    } catch (_) {
+      // Presence should not crash the UI.
+    }
+  }
+
+  Future<void> _setOffline() async {
+    try {
+      await ref.read(userProfileRepositoryProvider).setPresence(
+            userId: widget.userId,
+            isOnline: false,
+            seenAtUtc: DateTime.now().toUtc(),
+          );
+    } catch (_) {
+      // Presence should not crash the UI.
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    _setOffline();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }

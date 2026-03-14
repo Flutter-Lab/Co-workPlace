@@ -1,7 +1,9 @@
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/features/auth/providers/auth_providers.dart';
+import 'package:coworkplace/features/mode/domain/default_mode_presets.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
+import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
@@ -110,6 +112,21 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                       padding: const EdgeInsets.all(16),
                       children: [
                         _ProfileHeader(profile: profile),
+                        const SizedBox(height: 12),
+                        Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.mood_outlined),
+                            title: const Text('Current Mode'),
+                            subtitle: Text(
+                              profile.currentMode?.label ?? 'Not set',
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              tooltip: 'Edit Mode',
+                              onPressed: _editCurrentMode,
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         _AccountSecurityCard(
                           authUserEmail: authUser?.email,
@@ -846,7 +863,143 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
       _showSnack('Failed to upgrade account: $error');
     }
   }
+
+  Future<void> _editCurrentMode() async {
+    final session = ref.read(appSessionProvider).valueOrNull;
+    final profile = session?.profile;
+    if (session?.userId == null || profile == null) {
+      _showSnack('Profile is not ready yet.');
+      return;
+    }
+
+    final modeDetailController = TextEditingController();
+    var selectedPresetId =
+        profile.currentMode?.presetId ?? defaultModePresets.first.id;
+
+    final savedLabel = profile.currentMode?.label;
+    final selectedPreset = defaultModePresets.firstWhere(
+      (preset) => preset.id == selectedPresetId,
+      orElse: () => defaultModePresets.first,
+    );
+
+    if (savedLabel != null && savedLabel.startsWith('${selectedPreset.label} - ')) {
+      modeDetailController.text =
+          savedLabel.substring('${selectedPreset.label} - '.length).trim();
+    }
+
+    final result = await showModalBottomSheet<_ModeDraft>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Update Current Mode',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final preset in defaultModePresets)
+                          ChoiceChip(
+                            label: Text(preset.label),
+                            selected: selectedPresetId == preset.id,
+                            onSelected: (_) {
+                              setModalState(() {
+                                selectedPresetId = preset.id;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: modeDetailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Mode Detail (Optional)',
+                        hintText: 'Add short context',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              Navigator.of(context).pop(
+                                _ModeDraft(
+                                  selectedPresetId: selectedPresetId,
+                                  detail: modeDetailController.text.trim(),
+                                ),
+                              );
+                            },
+                            child: const Text('Save Mode'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    final preset = defaultModePresets.firstWhere(
+      (p) => p.id == result.selectedPresetId,
+    );
+    final modeLabel =
+        result.detail.isEmpty ? preset.label : '${preset.label} - ${result.detail}';
+
+    final updatedProfile = profile.copyWith(
+      currentMode: UserCurrentMode(
+        label: modeLabel,
+        presetId: preset.id,
+        updatedAtUtc: DateTime.now().toUtc(),
+      ),
+    );
+
+    try {
+      final repository = ref.read(userProfileRepositoryProvider);
+      await repository.upsert(updatedProfile);
+      ref.invalidate(appSessionProvider);
+      if (!mounted) return;
+      _showSnack('Current mode updated.');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnack('Failed to update mode: $error');
+    }
+  }
 }
+
+class _ModeDraft {
+  const _ModeDraft({required this.selectedPresetId, required this.detail});
+
+  final String selectedPresetId;
+  final String detail;
+}
+
 
 class _AccountSecurityCard extends StatelessWidget {
   const _AccountSecurityCard({
