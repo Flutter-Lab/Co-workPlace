@@ -4,6 +4,7 @@ import 'package:coworkplace/features/auth/providers/auth_providers.dart';
 import 'package:coworkplace/features/mode/domain/default_mode_presets.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
+import 'package:coworkplace/features/settings/presentation/settings_screen.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
@@ -40,7 +41,22 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
     final sessionAsync = ref.watch(appSessionProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Profile')),
+      appBar: AppBar(
+        title: const Text('My Profile'),
+        actions: [
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: sessionAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) => Center(child: Text('Session error: $error')),
@@ -1045,6 +1061,11 @@ class _ProfileHeader extends StatelessWidget {
 
   final UserProfile profile;
 
+  String _formatDayStart(int dayStartHour) {
+    final dt = DateTime(2000, 1, 1, dayStartHour, 0);
+    return DateFormat('hh:mm a').format(dt);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -1056,7 +1077,7 @@ class _ProfileHeader extends StatelessWidget {
         ),
         title: Text(profile.displayName),
         subtitle: Text(
-          '@${profile.username} • ${profile.timezone} • ${profile.currentMode?.label ?? 'No mode set'}',
+          '@${profile.username} • ${profile.timezone} • Start ${_formatDayStart(profile.dayStartHour)} • ${profile.currentMode?.label ?? 'No mode set'}',
         ),
       ),
     );

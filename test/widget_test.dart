@@ -41,6 +41,6 @@ void main() {
 
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Friends'), findsOneWidget);
-    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Profile'), findsOneWidget);
   });
 }

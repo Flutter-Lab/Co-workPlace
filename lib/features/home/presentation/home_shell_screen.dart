@@ -1,7 +1,6 @@
 import 'package:coworkplace/features/friends/presentation/friends_screen.dart';
 import 'package:coworkplace/features/home/presentation/home_screen.dart';
 import 'package:coworkplace/features/profile/presentation/personal_profile_screen.dart';
-import 'package:coworkplace/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 
 class HomeShellScreen extends StatefulWidget {
@@ -14,12 +13,12 @@ class HomeShellScreen extends StatefulWidget {
 class _HomeShellScreenState extends State<HomeShellScreen> {
   int _index = 0;
 
-  static const _titles = ['Coworkplace', 'Friends', 'Settings', 'Profile'];
+  static const _titles = ['Coworkplace', 'Friends', 'Profile'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _index == 3 ? null : AppBar(title: Text(_titles[_index])),
+      appBar: _index == 2 ? null : AppBar(title: Text(_titles[_index])),
       body: _buildPage(_index),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -40,11 +39,6 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
             label: 'Friends',
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',
@@ -61,8 +55,6 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
       case 1:
         return const FriendsScreen();
       case 2:
-        return const SettingsScreen();
-      case 3:
         return const PersonalProfileScreen();
       default:
         return const HomeScreen();

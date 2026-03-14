@@ -4,6 +4,7 @@ import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/features/friends/domain/friend_connection.dart';
 import 'package:coworkplace/features/friends/presentation/friend_profile_screen.dart';
 import 'package:coworkplace/features/friends/providers/friend_providers.dart';
+import 'package:coworkplace/features/profile/presentation/personal_profile_screen.dart';
 import 'package:coworkplace/features/profile/data/user_profile_repository.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
@@ -16,6 +17,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -57,6 +59,8 @@ class HomeScreen extends ConsumerWidget {
                   taskRepository: taskRepository,
                   completionRepository: completionRepository,
                   friendStream: friendRepository.watchFriends(userId),
+                  currentUserId: userId,
+                  currentUserProfile: profile,
                   currentFeedViewMode: profile.feedViewMode,
                 ),
                 const SizedBox(height: 56),
@@ -109,6 +113,8 @@ class _FriendFeedSection extends ConsumerStatefulWidget {
     required this.taskRepository,
     required this.completionRepository,
     required this.friendStream,
+    required this.currentUserId,
+    required this.currentUserProfile,
     required this.currentFeedViewMode,
   });
 
@@ -116,6 +122,8 @@ class _FriendFeedSection extends ConsumerStatefulWidget {
   final TaskRepository taskRepository;
   final CompletionRepository completionRepository;
   final Stream<List<FriendConnection>> friendStream;
+  final String currentUserId;
+  final UserProfile currentUserProfile;
   final FeedViewMode currentFeedViewMode;
 
   @override
@@ -147,6 +155,16 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
+            _FriendFeedTile(
+              profile: widget.currentUserProfile,
+              taskRepository: widget.taskRepository,
+              completionRepository: widget.completionRepository,
+              localDateKeyResolver: _resolveLocalDateKey,
+              compact: false,
+              isSelf: true,
+              viewerTimezone: widget.currentUserProfile.timezone,
+            ),
+            const SizedBox(height: 8),
             StreamBuilder<List<FriendConnection>>(
               stream: widget.friendStream,
               builder: (context, snapshot) {
@@ -207,6 +225,8 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
                             completionRepository: widget.completionRepository,
                             localDateKeyResolver: _resolveLocalDateKey,
                             compact: true,
+                            isSelf: false,
+                            viewerTimezone: widget.currentUserProfile.timezone,
                           );
                         },
                       );
@@ -220,7 +240,7 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
                           completionRepository: widget.completionRepository,
                           localDateKeyResolver: _resolveLocalDateKey,
                           compact: false,
-                        );
+                          isSelf: false,                        viewerTimezone: widget.currentUserProfile.timezone,                        );
                       }).toList(),
                     );
                   },
@@ -272,6 +292,8 @@ class _FriendFeedTile extends StatelessWidget {
     required this.completionRepository,
     required this.localDateKeyResolver,
     required this.compact,
+    required this.isSelf,
+    required this.viewerTimezone,
   });
 
   final UserProfile profile;
@@ -279,6 +301,8 @@ class _FriendFeedTile extends StatelessWidget {
   final CompletionRepository completionRepository;
   final String Function(UserProfile profile) localDateKeyResolver;
   final bool compact;
+  final bool isSelf;
+  final String viewerTimezone;
 
   @override
   Widget build(BuildContext context) {
@@ -333,6 +357,7 @@ class _FriendFeedTile extends StatelessWidget {
   }) {
     final modeLabel = profile.currentMode?.label ?? 'No mode';
     final isOnline = _isOnline(profile);
+    final cardTitle = isSelf ? 'My Tasks' : profile.displayName;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -368,15 +393,15 @@ class _FriendFeedTile extends StatelessWidget {
             ),
           ],
         ),
-        title: Text(profile.displayName),
-        subtitle: Text('$modeLabel\n$summary'),
+        title: Text(cardTitle),
+        subtitle: Text('$modeLabel\n$summary\nDay start: ${_formatDayStartForViewer(viewerTimezone)}'),
         children: [
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                _presenceLabel(profile),
+                isSelf ? 'This is you' : _presenceLabel(profile),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: isOnline ? Colors.green : Theme.of(context).hintColor,
                 ),
@@ -405,9 +430,9 @@ class _FriendFeedTile extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton.tonalIcon(
-              onPressed: () => _openFullProfile(context),
+              onPressed: () => _openProfile(context),
               icon: const Icon(Icons.person_search_outlined),
-              label: const Text('Show Full Profile'),
+              label: Text(isSelf ? 'My Profile' : 'Show Full Profile'),
             ),
           ),
         ],
@@ -433,6 +458,27 @@ class _FriendFeedTile extends StatelessWidget {
       return 'Skipped';
     }
     return 'Pending';
+  }
+
+  String _formatDayStartForViewer(String viewerTimezone) {
+    try {
+      final ownerLocation = tz.getLocation(profile.timezone);
+      final now = tz.TZDateTime.now(ownerLocation);
+      final ownerDayStart = tz.TZDateTime(
+        ownerLocation,
+        now.year,
+        now.month,
+        now.day,
+        profile.dayStartHour,
+        0,
+      );
+      final viewerLocation = tz.getLocation(viewerTimezone);
+      final viewerDayStart = tz.TZDateTime.from(ownerDayStart, viewerLocation);
+      final formatted = DateFormat('hh:mm a').format(viewerDayStart);
+      return formatted;
+    } catch (_) {
+      return DateFormat('hh:mm a').format(DateTime(2000, 1, 1, profile.dayStartHour, 0));
+    }
   }
 
   bool _isOnline(UserProfile profile) {
@@ -469,7 +515,16 @@ class _FriendFeedTile extends StatelessWidget {
     return 'Last seen ${diff.inDays}d ago';
   }
 
-  void _openFullProfile(BuildContext context) {
+  void _openProfile(BuildContext context) {
+    if (isSelf) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const PersonalProfileScreen(),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => FriendProfileScreen(profile: profile),
