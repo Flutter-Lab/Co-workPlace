@@ -6,6 +6,7 @@ import 'package:coworkplace/features/tasks/providers/task_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:coworkplace/features/profile/presentation/task_history_screen.dart';
 
 class FriendProfileScreen extends ConsumerWidget {
   const FriendProfileScreen({
@@ -24,7 +25,26 @@ class FriendProfileScreen extends ConsumerWidget {
     final localDateKey = _safeLocalDateKey(profile);
 
     return Scaffold(
-      appBar: AppBar(title: Text('${profile.displayName} Profile')),
+      appBar: AppBar(
+        title: Text('${profile.displayName} Profile'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'History',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TaskHistoryScreen(
+                    userId: profile.id,
+                    timezone: profile.timezone,
+                    dayStartHour: profile.dayStartHour,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: StreamBuilder<List<Task>>(
         stream: taskRepository.watchUserTasks(profile.id),
         builder: (context, taskSnapshot) {
