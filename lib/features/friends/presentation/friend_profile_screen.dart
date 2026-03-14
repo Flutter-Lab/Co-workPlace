@@ -28,18 +28,27 @@ class FriendProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text('${profile.displayName} Profile'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'History',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TaskHistoryScreen(
-                    userId: profile.id,
-                    timezone: profile.timezone,
-                    dayStartHour: profile.dayStartHour,
-                  ),
-                ),
+          StreamBuilder<List<Task>>(
+            stream: taskRepository.watchUserTasks(profile.id),
+            builder: (context, taskSnapshot) {
+              if (taskSnapshot.hasError) return const SizedBox.shrink();
+              if (!taskSnapshot.hasData) return const SizedBox.shrink();
+              final activeTasks = taskSnapshot.data!.where((t) => t.active).toList();
+              if (activeTasks.isEmpty) return const SizedBox.shrink();
+              return IconButton(
+                icon: const Icon(Icons.history),
+                tooltip: 'History',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TaskHistoryScreen(
+                        userId: profile.id,
+                        timezone: profile.timezone,
+                        dayStartHour: profile.dayStartHour,
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),

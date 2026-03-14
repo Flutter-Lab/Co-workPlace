@@ -53,8 +53,8 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
           return FutureBuilder<List<TaskCompletion>>(
             future: _historyFuture,
             builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+              if (taskSnapshot.connectionState == ConnectionState.waiting || snap.connectionState == ConnectionState.waiting) {
+                return _buildLoadingList();
               }
               if (snap.hasError) {
                 return Center(child: Text('Failed to load history: ${snap.error}'));
@@ -89,6 +89,30 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildLoadingList() {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        return Card(
+          margin: EdgeInsets.zero,
+          child: ListTile(
+            leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: Theme.of(context).disabledColor.withOpacity(0.2), shape: BoxShape.circle)),
+            title: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(width: 150, height: 12, color: Theme.of(context).disabledColor.withOpacity(0.2)),
+            ),
+            subtitle: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(width: 100, height: 10, margin: const EdgeInsets.only(top: 8), color: Theme.of(context).disabledColor.withOpacity(0.12)),
+            ),
+          ),
+        );
+      },
     );
   }
 
