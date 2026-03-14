@@ -394,7 +394,24 @@ class _FriendFeedTile extends StatelessWidget {
           ],
         ),
         title: Text(cardTitle),
-        subtitle: Text('$modeLabel\n$summary\nDay start: ${_formatDayStartForViewer(viewerTimezone)}'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(modeLabel),
+            const SizedBox(height: 6),
+            Text(summary),
+            const SizedBox(height: 8),
+            // Progress bar: completed vs total
+            Builder(builder: (context) {
+              final doneCount = completionByTaskId.values.where((c) => c.status == CompletionStatus.done).length;
+              final totalCount = activeTasks.length;
+              final percent = totalCount == 0 ? 0.0 : (doneCount / totalCount).clamp(0.0, 1.0);
+              return TaskCompletionBar(percent: percent, done: doneCount, total: totalCount);
+            }),
+            const SizedBox(height: 6),
+            Text('Day start: ${_formatDayStartForViewer(viewerTimezone)}'),
+          ],
+        ),
         children: [
           Align(
             alignment: Alignment.centerLeft,
@@ -529,6 +546,57 @@ class _FriendFeedTile extends StatelessWidget {
       MaterialPageRoute<void>(
         builder: (_) => FriendProfileScreen(profile: profile),
       ),
+    );
+  }
+}
+
+class TaskCompletionBar extends StatelessWidget {
+  const TaskCompletionBar({required this.percent, required this.done, required this.total, super.key});
+
+  final double percent;
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.06);
+    final fillColor = percent >= 1.0
+        ? Colors.green
+        : Theme.of(context).colorScheme.primary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: LayoutBuilder(builder: (context, constraints) {
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: percent),
+                duration: const Duration(milliseconds: 400),
+                builder: (context, value, child) {
+                  return FractionallySizedBox(
+                    widthFactor: value,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: fillColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 6),
+        Text('${(percent * 100).round()}% • $done / $total', style: Theme.of(context).textTheme.bodySmall),
+      ],
     );
   }
 }
