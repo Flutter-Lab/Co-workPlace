@@ -75,6 +75,48 @@ class CompletionRepository {
     return TaskCompletion.fromMap({...data, 'id': snapshot.id});
   }
 
+  Future<void> deleteCompletion({
+    required String taskId,
+    required String userId,
+    required String localDateKey,
+  }) async {
+    final completionId = _completionDocId(
+      taskId: taskId,
+      userId: userId,
+      localDateKey: localDateKey,
+    );
+    await _completions(userId).doc(completionId).delete();
+  }
+
+  Future<void> deleteCompletionsForDate({
+    required String userId,
+    required String localDateKey,
+  }) async {
+    final snapshot = await _completions(userId)
+        .where('localDateKey', isEqualTo: localDateKey)
+        .get();
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
+  Future<List<TaskCompletion>> getCompletionsForDateRange({
+    required String userId,
+    required String fromDateKey,
+    required String toDateKey,
+  }) async {
+    final snapshot = await _completions(userId)
+        .where('localDateKey', isGreaterThanOrEqualTo: fromDateKey)
+        .where('localDateKey', isLessThanOrEqualTo: toDateKey)
+        .get();
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      return TaskCompletion.fromMap({...data, 'id': doc.id});
+    }).toList();
+  }
+
   String _completionDocId({
     required String taskId,
     required String userId,

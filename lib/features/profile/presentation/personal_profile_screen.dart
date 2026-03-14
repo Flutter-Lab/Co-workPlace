@@ -4,6 +4,7 @@ import 'package:coworkplace/features/auth/providers/auth_providers.dart';
 import 'package:coworkplace/features/mode/domain/default_mode_presets.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
+import 'package:coworkplace/features/profile/presentation/task_history_screen.dart';
 import 'package:coworkplace/features/settings/presentation/settings_screen.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
@@ -44,6 +45,25 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
       appBar: AppBar(
         title: const Text('My Profile'),
         actions: [
+          IconButton(
+            tooltip: 'Task History',
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              final session = ref.read(appSessionProvider).valueOrNull;
+              final profile = session?.profile;
+              final userId = session?.userId;
+              if (profile == null || userId == null) return;
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => TaskHistoryScreen(
+                    userId: userId,
+                    timezone: profile.timezone,
+                    dayStartHour: profile.dayStartHour,
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Settings',
             icon: const Icon(Icons.settings_outlined),
@@ -153,6 +173,7 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             for (final filter in _TaskFilter.values)
                               ChoiceChip(
@@ -164,6 +185,18 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                                   });
                                 },
                               ),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                              ),
+                              icon: const Icon(Icons.restart_alt, size: 18),
+                              label: const Text('Reset Today'),
+                              onPressed: () => _confirmResetToday(
+                                userId: userId,
+                                localDateKey: localDateKey,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -180,12 +213,36 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                             final completion = completionByTaskId[task.id];
                             return Card(
                               child: ListTile(
-                                leading: Icon(
-                                  completion?.status == CompletionStatus.done
-                                      ? Icons.check_circle
-                                      : completion?.status == CompletionStatus.skipped
-                                          ? Icons.skip_next
-                                          : Icons.radio_button_unchecked,
+                                leading: IconButton(
+                                  tooltip: completion?.status == CompletionStatus.done
+                                      ? 'Mark pending'
+                                      : 'Mark done',
+                                  icon: Icon(
+                                    completion?.status == CompletionStatus.done
+                                        ? Icons.check_circle
+                                        : completion?.status == CompletionStatus.skipped
+                                            ? Icons.skip_next
+                                            : Icons.radio_button_unchecked,
+                                    color: completion?.status == CompletionStatus.done
+                                        ? Theme.of(context).colorScheme.primary
+                                        : null,
+                                  ),
+                                  onPressed: () {
+                                    if (completion?.status == CompletionStatus.done) {
+                                      _clearCompletion(
+                                        taskId: task.id,
+                                        userId: userId,
+                                        localDateKey: localDateKey,
+                                      );
+                                    } else {
+                                      _setCompletion(
+                                        taskId: task.id,
+                                        userId: userId,
+                                        localDateKey: localDateKey,
+                                        status: CompletionStatus.done,
+                                      );
+                                    }
+                                  },
                                 ),
                                 title: Text(task.title),
                                 subtitle: Text(
@@ -352,6 +409,59 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
       _showSnack(status == CompletionStatus.done ? 'Marked done.' : 'Marked skipped.');
     } catch (error) {
       _showSnack('Failed to update completion: $error');
+    }
+  }
+
+  Future<void> _clearCompletion({
+    required String taskId,
+    required String userId,
+    required String localDateKey,
+  }) async {
+    try {
+      final repository = ref.read(completionRepositoryProvider);
+      await repository.deleteCompletion(
+        taskId: taskId,
+        userId: userId,
+        localDateKey: localDateKey,
+      );
+      _showSnack('Marked as pending.');
+    } catch (error) {
+      _showSnack('Failed to update: $error');
+    }
+  }
+
+  Future<void> _confirmResetToday({
+    required String userId,
+    required String localDateKey,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset Today'),
+        content: const Text(
+            'This will clear all task completions for today. Continue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final repository = ref.read(completionRepositoryProvider);
+      await repository.deleteCompletionsForDate(
+        userId: userId,
+        localDateKey: localDateKey,
+      );
+      _showSnack("Today's tasks have been reset.");
+    } catch (error) {
+      _showSnack('Failed to reset: $error');
     }
   }
 
