@@ -25,16 +25,19 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   ];
 
   final _displayNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _modeDetailController = TextEditingController();
 
   int _dayStartHour = 4;
   String _selectedTimezone = _timezoneOptions.first.value;
   String _selectedPresetId = defaultModePresets.first.id;
+  FeedViewMode _selectedFeedViewMode = FeedViewMode.list;
   bool _isSaving = false;
 
   @override
   void dispose() {
     _displayNameController.dispose();
+    _usernameController.dispose();
     _modeDetailController.dispose();
     super.dispose();
   }
@@ -49,6 +52,17 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     final displayName = _displayNameController.text.trim();
     if (displayName.isEmpty) {
       _showSnack('Please enter a display name.');
+      return;
+    }
+
+    final username = _usernameController.text.trim().toLowerCase();
+    if (username.isEmpty) {
+      _showSnack('Please enter a username.');
+      return;
+    }
+
+    if (!RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(username)) {
+      _showSnack('Username must be 3-20 chars using lowercase letters, numbers, or _.');
       return;
     }
 
@@ -67,9 +81,11 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     final profile = UserProfile(
       id: session.userId!,
       displayName: displayName,
+      username: username,
       timezone: timezone,
       dayStartHour: _dayStartHour,
       groupIds: existingProfile?.groupIds ?? const [],
+      feedViewMode: existingProfile?.feedViewMode ?? _selectedFeedViewMode,
       activeGroupId: existingProfile?.activeGroupId,
       currentMode: UserCurrentMode(
         label: modeLabel,
@@ -129,6 +145,16 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          TextField(
+            controller: _usernameController,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              labelText: 'Username',
+              hintText: 'e.g. sakib_dev',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _selectedTimezone,
             decoration: const InputDecoration(
@@ -167,6 +193,33 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
               setState(() {
                 _dayStartHour = value;
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<FeedViewMode>(
+            initialValue: _selectedFeedViewMode,
+            decoration: const InputDecoration(
+              labelText: 'Default Feed View',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: FeedViewMode.list,
+                child: Text('List'),
+              ),
+              DropdownMenuItem(
+                value: FeedViewMode.grid,
+                child: Text('Grid'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value == null) {
+                return;
+              }
+
+              setState(() {
+                _selectedFeedViewMode = value;
               });
             },
           ),

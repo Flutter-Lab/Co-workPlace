@@ -7,8 +7,6 @@ final appSessionProvider = StreamProvider<AppSession>((ref) async* {
   final authRepository = ref.watch(authRepositoryProvider);
   final profileRepository = ref.watch(userProfileRepositoryProvider);
 
-  await authRepository.signInAnonymouslyIfNeeded();
-
   await for (final authUser in authRepository.authStateChanges()) {
     if (authUser == null) {
       yield const AppSession.unauthenticated();

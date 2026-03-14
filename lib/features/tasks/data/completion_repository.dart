@@ -6,17 +6,16 @@ class CompletionRepository {
 
   final FirebaseFirestore _firestore;
 
-  CollectionReference<Map<String, dynamic>> _completions(String groupId) {
-    return _firestore.collection('groups').doc(groupId).collection('completions');
+  CollectionReference<Map<String, dynamic>> _completions(String userId) {
+    return _firestore.collection('users').doc(userId).collection('completions');
   }
 
   Stream<List<TaskCompletion>> watchUserCompletionsForDate({
-    required String groupId,
     required String userId,
     required String localDateKey,
+    String? groupId,
   }) {
-    return _completions(groupId)
-        .where('userId', isEqualTo: userId)
+    return _completions(userId)
         .where('localDateKey', isEqualTo: localDateKey)
         .snapshots()
         .map((snapshot) {
@@ -28,11 +27,11 @@ class CompletionRepository {
   }
 
   Future<TaskCompletion> upsertCompletion({
-    required String groupId,
     required String taskId,
     required String userId,
     required String localDateKey,
     required CompletionStatus status,
+    String? groupId,
     String? notes,
   }) async {
     final completionId = _completionDocId(
@@ -51,15 +50,15 @@ class CompletionRepository {
       notes: notes?.trim().isEmpty ?? true ? null : notes!.trim(),
     );
 
-    await _completions(groupId).doc(completionId).set(completion.toMap(), SetOptions(merge: true));
+    await _completions(userId).doc(completionId).set(completion.toMap(), SetOptions(merge: true));
     return completion;
   }
 
   Future<TaskCompletion?> getCompletionForTaskDate({
-    required String groupId,
     required String taskId,
     required String userId,
     required String localDateKey,
+    String? groupId,
   }) async {
     final completionId = _completionDocId(
       taskId: taskId,
@@ -67,7 +66,7 @@ class CompletionRepository {
       localDateKey: localDateKey,
     );
 
-    final snapshot = await _completions(groupId).doc(completionId).get();
+    final snapshot = await _completions(userId).doc(completionId).get();
     final data = snapshot.data();
     if (!snapshot.exists || data == null) {
       return null;

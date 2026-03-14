@@ -24,10 +24,11 @@ void main() {
                 profile: UserProfile(
                   id: 'test-user',
                   displayName: 'Tester',
+                  username: 'test_user',
                   timezone: 'UTC',
                   dayStartHour: 4,
-                  groupIds: const ['group-1'],
-                  activeGroupId: 'group-1',
+                  groupIds: const [],
+                  feedViewMode: FeedViewMode.list,
                 ),
               ),
             ),
@@ -39,7 +40,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Members'), findsOneWidget);
+    expect(find.text('Friends'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
   });
 }

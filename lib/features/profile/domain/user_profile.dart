@@ -1,27 +1,35 @@
+enum FeedViewMode { list, grid }
+
 class UserProfile {
   const UserProfile({
     required this.id,
     required this.displayName,
+    required this.username,
     required this.timezone,
     required this.dayStartHour,
     required this.groupIds,
+    required this.feedViewMode,
     this.activeGroupId,
     this.currentMode,
   });
 
   final String id;
   final String displayName;
+  final String username;
   final String timezone;
   final int dayStartHour;
   final List<String> groupIds;
+  final FeedViewMode feedViewMode;
   final String? activeGroupId;
   final UserCurrentMode? currentMode;
 
   UserProfile copyWith({
     String? displayName,
+    String? username,
     String? timezone,
     int? dayStartHour,
     List<String>? groupIds,
+    FeedViewMode? feedViewMode,
     String? activeGroupId,
     UserCurrentMode? currentMode,
     bool clearActiveGroupId = false,
@@ -30,9 +38,11 @@ class UserProfile {
     return UserProfile(
       id: id,
       displayName: displayName ?? this.displayName,
+      username: username ?? this.username,
       timezone: timezone ?? this.timezone,
       dayStartHour: dayStartHour ?? this.dayStartHour,
       groupIds: groupIds ?? this.groupIds,
+      feedViewMode: feedViewMode ?? this.feedViewMode,
       activeGroupId: clearActiveGroupId
           ? null
           : (activeGroupId ?? this.activeGroupId),
@@ -44,9 +54,11 @@ class UserProfile {
     return {
       'id': id,
       'displayName': displayName,
+      'username': username,
       'timezone': timezone,
       'dayStartHour': dayStartHour,
       'groupIds': groupIds,
+      'feedViewMode': feedViewMode.name,
       'activeGroupId': activeGroupId,
       'currentMode': currentMode?.toMap(),
     };
@@ -62,18 +74,41 @@ class UserProfile {
     final parsedDayStartHour = rawDayStartHour is int
         ? rawDayStartHour
         : (rawDayStartHour is num ? rawDayStartHour.toInt() : 4);
+    final rawFeedViewMode = map['feedViewMode'] as String?;
+    final parsedFeedViewMode = FeedViewMode.values.where((mode) {
+      return mode.name == rawFeedViewMode;
+    }).firstOrNull ?? FeedViewMode.list;
+    final rawUsername = (map['username'] as String?)?.trim();
+    final fallbackDisplayName = (map['displayName'] as String?)?.trim() ?? '';
 
     return UserProfile(
       id: map['id'] as String,
-      displayName: map['displayName'] as String,
+      displayName: fallbackDisplayName,
+      username: rawUsername?.isNotEmpty == true
+          ? rawUsername!
+          : _fallbackUsername(id: map['id'] as String, displayName: fallbackDisplayName),
       timezone: map['timezone'] as String,
       dayStartHour: parsedDayStartHour,
       groupIds: parsedGroupIds,
+      feedViewMode: parsedFeedViewMode,
       activeGroupId: map['activeGroupId'] as String?,
       currentMode: map['currentMode'] == null
           ? null
           : UserCurrentMode.fromMap(map['currentMode'] as Map<String, dynamic>),
     );
+  }
+
+  static String _fallbackUsername({required String id, required String displayName}) {
+    final normalizedDisplay = displayName
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    if (normalizedDisplay.isNotEmpty) {
+      return normalizedDisplay;
+    }
+
+    final safeId = id.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+    return safeId.isEmpty ? 'user' : 'user_${safeId.substring(0, safeId.length > 8 ? 8 : safeId.length)}';
   }
 }
 

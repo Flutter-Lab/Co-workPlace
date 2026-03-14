@@ -2,7 +2,7 @@ import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/app/theme/app_theme.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_provider.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_state.dart';
-import 'package:coworkplace/features/groups/presentation/group_setup_screen.dart';
+import 'package:coworkplace/features/auth/presentation/auth_entry_screen.dart';
 import 'package:coworkplace/features/home/presentation/home_shell_screen.dart';
 import 'package:coworkplace/features/profile/presentation/profile_setup_screen.dart';
 import 'package:flutter/material.dart';
@@ -46,15 +46,11 @@ class _SessionGate extends ConsumerWidget {
             _StartupErrorScreen(message: 'Session error: $error'),
         data: (state) {
           if (!state.isAuthenticated) {
-            return const _SplashScreen();
+            return const AuthEntryScreen();
           }
 
           if (!state.hasProfile) {
             return const ProfileSetupScreen();
-          }
-
-          if (!state.hasActiveGroup) {
-            return const GroupSetupScreen();
           }
 
           return const HomeShellScreen();

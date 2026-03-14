@@ -1,3 +1,4 @@
+import 'package:coworkplace/features/profile/presentation/personal_profile_screen.dart';
 import 'package:flutter/material.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -7,7 +8,22 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: const [
+      children: [
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('My Profile & Tasks'),
+            subtitle: const Text('Open personal profile and manage your own tasks.'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PersonalProfileScreen(),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
         Card(
           child: ListTile(
             leading: Icon(Icons.manage_accounts),

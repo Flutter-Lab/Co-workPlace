@@ -3,13 +3,13 @@ enum TaskType { daily, oneTime }
 class Task {
   const Task({
     required this.id,
-    required this.groupId,
     required this.ownerId,
     required this.title,
     required this.type,
     required this.active,
     required this.createdAtUtc,
     required this.modifiedAtUtc,
+    this.groupId,
     this.description,
     this.localTimeMinutes,
     this.scheduledTimeUtc,
@@ -19,7 +19,7 @@ class Task {
   });
 
   final String id;
-  final String groupId;
+  final String? groupId;
   final String ownerId;
   final String title;
   final String? description;
@@ -76,7 +76,6 @@ class Task {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'groupId': groupId,
       'ownerId': ownerId,
       'title': title,
       'description': description,
@@ -95,7 +94,7 @@ class Task {
   factory Task.fromMap(Map<String, dynamic> map) {
     return Task(
       id: map['id'] as String,
-      groupId: map['groupId'] as String,
+      groupId: map['groupId'] as String?,
       ownerId: map['ownerId'] as String,
       title: map['title'] as String,
       description: map['description'] as String?,

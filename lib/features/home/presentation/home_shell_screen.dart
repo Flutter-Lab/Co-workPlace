@@ -1,12 +1,13 @@
+import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/features/friends/presentation/friends_screen.dart';
 import 'package:coworkplace/features/home/presentation/home_screen.dart';
 import 'package:coworkplace/features/mode/domain/default_mode_presets.dart';
-import 'package:coworkplace/features/members/presentation/members_screen.dart';
+import 'package:coworkplace/features/profile/presentation/personal_profile_screen.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/features/settings/presentation/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:coworkplace/app/session/app_session_provider.dart';
 
 class HomeShellScreen extends ConsumerStatefulWidget {
   const HomeShellScreen({super.key});
@@ -18,9 +19,9 @@ class HomeShellScreen extends ConsumerStatefulWidget {
 class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
   int _index = 0;
 
-  static const _pages = [HomeScreen(), MembersScreen(), SettingsScreen()];
+  static const _pages = [HomeScreen(), FriendsScreen(), SettingsScreen()];
 
-  static const _titles = ['Coworkplace', 'Members', 'Settings'];
+  static const _titles = ['Coworkplace', 'Friends', 'Settings'];
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +38,11 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
               icon: const Icon(Icons.mood, size: 18),
               label: Text(currentModeLabel ?? 'Set Mode'),
             ),
+          IconButton(
+            tooltip: 'My Profile',
+            onPressed: _openMyProfile,
+            icon: const Icon(Icons.person_outline),
+          ),
         ],
       ),
       body: IndexedStack(index: _index, children: _pages),
@@ -54,9 +60,9 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            selectedIcon: Icon(Icons.groups),
-            label: 'Members',
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Friends',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
@@ -196,6 +202,14 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _openMyProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PersonalProfileScreen(),
+      ),
+    );
   }
 }
 

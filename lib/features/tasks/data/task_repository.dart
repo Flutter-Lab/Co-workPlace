@@ -6,27 +6,32 @@ class TaskRepository {
 
   final FirebaseFirestore _firestore;
 
-  CollectionReference<Map<String, dynamic>> _tasks(String groupId) {
-    return _firestore.collection('groups').doc(groupId).collection('tasks');
+  CollectionReference<Map<String, dynamic>> _tasks(String userId) {
+    return _firestore.collection('users').doc(userId).collection('tasks');
   }
 
-  Stream<List<Task>> watchGroupTasks(String groupId) {
-    return _tasks(groupId)
+  Stream<List<Task>> watchUserTasks(String userId) {
+    return _tasks(userId)
         .orderBy('createdAtUtc', descending: false)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) {
             final data = doc.data();
-            return Task.fromMap({...data, 'id': doc.id, 'groupId': groupId});
+            return Task.fromMap({...data, 'id': doc.id, 'ownerId': userId});
           }).toList();
         });
   }
 
+  // Temporary compatibility alias during migration away from group-owned data.
+  Stream<List<Task>> watchGroupTasks(String groupId) {
+    return watchUserTasks(groupId);
+  }
+
   Future<Task> createTask({
-    required String groupId,
     required String ownerId,
     required String title,
     required TaskType type,
+    String? groupId,
     String? description,
     int? localTimeMinutes,
     DateTime? scheduledTimeUtc,
@@ -40,7 +45,7 @@ class TaskRepository {
     }
 
     final nowUtc = DateTime.now().toUtc();
-    final docRef = _tasks(groupId).doc();
+    final docRef = _tasks(ownerId).doc();
     final task = Task(
       id: docRef.id,
       groupId: groupId,
@@ -74,7 +79,7 @@ class TaskRepository {
       throw StateError('Only the task owner can update this task.');
     }
 
-    final taskRef = _tasks(task.groupId).doc(task.id);
+    final taskRef = _tasks(task.ownerId).doc(task.id);
 
     await _firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(taskRef);
@@ -94,12 +99,13 @@ class TaskRepository {
   }
 
   Future<void> setTaskActive({
-    required String groupId,
+    required String ownerId,
     required String taskId,
     required bool active,
     required String actorUserId,
+    String? groupId,
   }) async {
-    final taskRef = _tasks(groupId).doc(taskId);
+    final taskRef = _tasks(ownerId).doc(taskId);
 
     await _firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(taskRef);

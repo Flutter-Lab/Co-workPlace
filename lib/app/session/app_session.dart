@@ -20,14 +20,4 @@ class AppSession {
   bool get hasProfile {
     return profile != null;
   }
-
-  bool get hasActiveGroup {
-    final profileValue = profile;
-    if (profileValue == null) {
-      return false;
-    }
-
-    final activeGroupId = profileValue.activeGroupId;
-    return activeGroupId != null && activeGroupId.isNotEmpty;
-  }
 }

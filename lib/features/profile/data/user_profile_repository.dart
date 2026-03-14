@@ -24,15 +24,26 @@ class UserProfileRepository {
     return UserProfile.fromMap({...data, 'id': userId});
   }
 
-  Stream<List<UserProfile>> watchByGroupId(String groupId) {
-    return _users.where('groupIds', arrayContains: groupId).snapshots().map((snapshot) {
-      return snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            return UserProfile.fromMap({...data, 'id': doc.id});
-          })
-          .toList();
-    });
+  Future<List<UserProfile>> getByIds(Iterable<String> userIds) async {
+    final seen = <String>{};
+    final orderedIds = userIds.where(seen.add).toList();
+    final results = await Future.wait(orderedIds.map(getById));
+    return results.whereType<UserProfile>().toList();
+  }
+
+  Future<UserProfile?> findByUsername(String username) async {
+    final normalized = username.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    final snapshot = await _users.where('username', isEqualTo: normalized).limit(1).get();
+    if (snapshot.docs.isEmpty) {
+      return null;
+    }
+
+    final doc = snapshot.docs.first;
+    return UserProfile.fromMap({...doc.data(), 'id': doc.id});
   }
 
   Future<void> upsert(UserProfile profile) async {
