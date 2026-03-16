@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/features/leaderboard/presentation/leaderboard_screen.dart';
 import 'package:coworkplace/core/app_constants.dart';
@@ -15,10 +17,12 @@ import 'package:coworkplace/features/tasks/data/task_repository.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
+import 'package:coworkplace/core/widgets/task_vote_button.dart';
 import 'package:coworkplace/core/widgets/user_avatar.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -154,23 +158,28 @@ class _LeaderboardCard extends ConsumerWidget {
       stream: friendRepo.watchFriends(myId),
       builder: (context, friendSnap) {
         if (friendSnap.hasError) return const SizedBox.shrink();
-        if (!friendSnap.hasData) return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: Center(child: CircularProgressIndicator()),
-        );
+        if (!friendSnap.hasData)
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CircularProgressIndicator()),
+          );
 
         final friends = friendSnap.data!;
         final friendIds = friends.map((f) => f.friendUserId as String).toSet();
         friendIds.add(myId);
 
         return FutureBuilder<List<Map<String, dynamic>>>(
-          future: service.getScoresForUsers(periodId: periodId, userIds: friendIds),
+          future: service.getScoresForUsers(
+            periodId: periodId,
+            userIds: friendIds,
+          ),
           builder: (context, scoresSnap) {
             if (scoresSnap.hasError) return const SizedBox.shrink();
-            if (scoresSnap.connectionState == ConnectionState.waiting) return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Center(child: CircularProgressIndicator()),
-            );
+            if (scoresSnap.connectionState == ConnectionState.waiting)
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              );
 
             final docs = scoresSnap.data ?? <Map<String, dynamic>>[];
             if (docs.isEmpty) {
@@ -179,7 +188,11 @@ class _LeaderboardCard extends ConsumerWidget {
                   title: const Text('Weekly Top'),
                   subtitle: const Text('No leaderboard data yet.'),
                   onTap: () {
-                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeaderboardScreen()));
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const LeaderboardScreen(),
+                      ),
+                    );
                   },
                 ),
               );
@@ -192,12 +205,13 @@ class _LeaderboardCard extends ConsumerWidget {
             return FutureBuilder<List<UserProfile>>(
               future: profileRepo.getByIds([topId]),
               builder: (context, profilesSnap) {
-                if (profilesSnap.connectionState == ConnectionState.waiting) return const Card(
-                  child: ListTile(
-                    title: Text('Weekly Top'),
-                    subtitle: Text('Loading...'),
-                  ),
-                );
+                if (profilesSnap.connectionState == ConnectionState.waiting)
+                  return const Card(
+                    child: ListTile(
+                      title: Text('Weekly Top'),
+                      subtitle: Text('Loading...'),
+                    ),
+                  );
 
                 final profiles = profilesSnap.data ?? <UserProfile>[];
                 final profile = profiles.isNotEmpty ? profiles.first : null;
@@ -210,7 +224,11 @@ class _LeaderboardCard extends ConsumerWidget {
                     subtitle: Text(display),
                     trailing: Text('$points pts'),
                     onTap: () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeaderboardScreen()));
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const LeaderboardScreen(),
+                        ),
+                      );
                     },
                   ),
                 );
@@ -461,6 +479,43 @@ class _FriendFeedTile extends StatelessWidget {
     final isOnline = _isOnline(profile);
     final cardTitle = isSelf ? 'My Tasks' : profile.displayName;
 
+    Stream<int> _votesStreamAcrossTasks(List<Task> tasks, String ownerId) {
+      if (tasks.isEmpty) return Stream.value(0);
+
+      return Stream.multi((controller) {
+        final counts = List<int>.filled(tasks.length, 0);
+        final subs = <StreamSubscription<QuerySnapshot>>[];
+
+        for (var i = 0; i < tasks.length; i++) {
+          final t = tasks[i];
+          final sub = FirebaseFirestore.instance
+              .collection('tasks')
+              .doc(ownerId)
+              .collection('tasks')
+              .doc(t.id)
+              .collection('votes')
+              .snapshots()
+              .listen(
+                (snap) {
+                  counts[i] = snap.docs.length;
+                  final sum = counts.fold<int>(0, (p, e) => p + e);
+                  controller.add(sum);
+                },
+                onError: (_) {
+                  // ignore individual errors for UI resilience
+                },
+              );
+          subs.add(sub);
+        }
+
+        controller.onCancel = () {
+          for (final s in subs) {
+            s.cancel();
+          }
+        };
+      });
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ExpansionTile(
@@ -490,6 +545,39 @@ class _FriendFeedTile extends StatelessWidget {
           ],
         ),
         title: Text(cardTitle),
+        // Show total votes in the trailing when collapsed (live)
+        trailing: StreamBuilder<int>(
+          stream: _votesStreamAcrossTasks(activeTasks, profile.id),
+          builder: (context, snap) {
+            if (snap.hasError) return const SizedBox.shrink();
+            if (!snap.hasData) return const SizedBox.shrink();
+            final totalVotes = snap.data ?? 0;
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (totalVotes > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6.0),
+                    child: Text(
+                      '$totalVotes',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                Icon(
+                  Icons.favorite,
+                  size: 18,
+                  color: totalVotes > 0
+                      ? Colors.pink
+                      : Theme.of(context).disabledColor,
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.expand_more),
+              ],
+            );
+          },
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -547,6 +635,9 @@ class _FriendFeedTile extends StatelessWidget {
                 leading: Icon(_statusIcon(completion?.status), size: 20),
                 title: Text(task.title),
                 subtitle: Text(_statusLabel(completion?.status)),
+                trailing: !isSelf
+                    ? TaskVoteButton(ownerId: profile.id, taskId: task.id)
+                    : null,
               );
             }),
           const SizedBox(height: 8),

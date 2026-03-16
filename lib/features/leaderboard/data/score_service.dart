@@ -54,18 +54,51 @@ class ScoreService {
   }
 
   // Like a task (owner gets a point). Ensures unique like per likerId via deterministic doc id.
-  Future<void> awardLike({required String ownerId, required String taskId, required String likerId}) async {
-    final likeRef = _firestore.doc('tasks/$ownerId/tasks/$taskId/likes/$likerId');
+  // Enforces a maximum of 10 votes per calendar day per user.
+  Future<void> awardVote({
+    required String ownerId,
+    required String taskId,
+    required String likerId,
+    required String likerLocalDateKey,
+  }) async {
+    final voteRef = _firestore.doc('tasks/$ownerId/tasks/$taskId/votes/$likerId');
+    final dailyVotesRef = _firestore.doc('users/$likerId/daily_votes/$likerLocalDateKey');
+    
     final now = DateTime.now().toUtc();
     final weekId = weekPeriodId(now);
     final monthId = monthPeriodId(now);
     final allId = alltimePeriodId();
 
     await _firestore.runTransaction((tx) async {
-      final likeSnap = await tx.get(likeRef);
-      if (likeSnap.exists) return; // already liked
-      tx.set(likeRef, {'createdAt': FieldValue.serverTimestamp()});
+      // 1. Check if already voted
+      final voteSnap = await tx.get(voteRef);
+      if (voteSnap.exists) return; // already voted
 
+      // 2. Check daily quota limit
+      final dailyVotesSnap = await tx.get(dailyVotesRef);
+      int votesUsed = 0;
+      if (dailyVotesSnap.exists) {
+        votesUsed = (dailyVotesSnap.data()?['count'] ?? 0) as int;
+      }
+      
+      if (votesUsed >= 10) {
+        throw Exception('Daily vote limit reached');
+      }
+
+      // Record the vote
+      tx.set(voteRef, {'createdAt': FieldValue.serverTimestamp()});
+      
+      // Increment daily quota constraint
+      tx.set(
+        dailyVotesRef,
+        {
+          'count': FieldValue.increment(1),
+          'updatedAtUtc': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+
+      // Award points to the task owner
       final weekRef = _firestore.doc('users/$ownerId/scores/$weekId');
       final monthRef = _firestore.doc('users/$ownerId/scores/$monthId');
       final allRef = _firestore.doc('users/$ownerId/scores/$allId');
@@ -74,6 +107,22 @@ class ScoreService {
       tx.set(monthRef, {'periodId': monthId, 'points': FieldValue.increment(1), 'updatedAtUtc': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       tx.set(allRef, {'periodId': allId, 'points': FieldValue.increment(1), 'updatedAtUtc': FieldValue.serverTimestamp()}, SetOptions(merge: true));
     });
+  }
+
+  // Stream daily votes used for UI counters
+  Stream<int> watchDailyVotesUsed(String userId, String localDateKey) {
+    return _firestore
+        .doc('users/$userId/daily_votes/$localDateKey')
+        .snapshots()
+        .map((snap) => (snap.data()?['count'] ?? 0) as int);
+  }
+
+  // Stream list of userIds who voted on a task
+  Stream<List<String>> watchTaskVotes(String ownerId, String taskId) {
+    return _firestore
+        .collection('tasks/$ownerId/tasks/$taskId/votes')
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.id).toList());
   }
 
   // Award for creating a task

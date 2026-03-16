@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:coworkplace/features/profile/presentation/task_history_screen.dart';
+import 'package:coworkplace/core/widgets/task_vote_button.dart';
 import 'package:coworkplace/core/widgets/user_avatar.dart';
 
 class FriendProfileScreen extends ConsumerWidget {
@@ -118,6 +119,7 @@ class FriendProfileScreen extends ConsumerWidget {
                           ),
                           title: Text(task.title),
                           subtitle: Text(_taskSubtitle(task, completion)),
+                          trailing: TaskVoteButton(ownerId: profile.id, taskId: task.id),
                         ),
                       );
                     }),
