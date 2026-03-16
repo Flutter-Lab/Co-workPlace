@@ -38,26 +38,27 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: ToggleButtons(
-              isSelected: [
-                _period == 'weekly',
-                _period == 'monthly',
-                _period == 'alltime',
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment<String>(
+                  value: 'weekly',
+                  label: Text('Weekly'),
+                ),
+                ButtonSegment<String>(
+                  value: 'monthly',
+                  label: Text('Monthly'),
+                ),
+                ButtonSegment<String>(
+                  value: 'alltime',
+                  label: Text('All-time'),
+                ),
               ],
-              onPressed: (i) {
+              selected: {_period},
+              onSelectionChanged: (Set<String> newSelection) {
                 setState(() {
-                  _period = i == 0
-                      ? 'weekly'
-                      : i == 1
-                      ? 'monthly'
-                      : 'alltime';
+                  _period = newSelection.first;
                 });
               },
-              children: const [
-                Text('Weekly'),
-                Text('Monthly'),
-                Text('All-time'),
-              ],
             ),
           ),
           Expanded(

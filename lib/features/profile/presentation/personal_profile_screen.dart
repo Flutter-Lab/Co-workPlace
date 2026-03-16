@@ -1305,45 +1305,49 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
     final profile = widget.profile;
     return Row(
       children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            InkWell(
-              onTap: () => _pickAndUploadPhoto(context, ref),
-              borderRadius: BorderRadius.circular(36),
-              child: CircleAvatar(
-                radius: 36,
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                backgroundImage: _cachedImage,
-                child: _cachedImage == null
-                    ? Text(
-                        profile.displayName.isNotEmpty
-                            ? profile.displayName[0].toUpperCase()
-                            : '?',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onPrimaryContainer,
-                            ),
-                      )
-                    : null,
-              ),
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.camera_alt,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.primary,
+        SizedBox(
+          width: 72,
+          height: 72,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              InkWell(
+                onTap: () => _pickAndUploadPhoto(context, ref),
+                borderRadius: BorderRadius.circular(36),
+                child: CircleAvatar(
+                  radius: 36,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  backgroundImage: _cachedImage,
+                  child: _cachedImage == null
+                      ? Text(
+                          profile.displayName.isNotEmpty
+                              ? profile.displayName[0].toUpperCase()
+                              : '?',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                        )
+                      : null,
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.camera_alt,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
