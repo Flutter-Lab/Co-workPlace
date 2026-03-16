@@ -4,6 +4,7 @@ import 'package:coworkplace/features/auth/providers/auth_providers.dart';
 import 'package:coworkplace/features/mode/domain/default_mode_presets.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
+import 'package:coworkplace/features/leaderboard/data/score_service.dart';
 import 'package:coworkplace/features/profile/presentation/task_history_screen.dart';
 import 'package:coworkplace/features/settings/presentation/settings_screen.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
@@ -400,12 +401,25 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
   }) async {
     try {
       final repository = ref.read(completionRepositoryProvider);
+      final previous = await repository.getCompletionForTaskDate(
+        taskId: taskId,
+        userId: userId,
+        localDateKey: localDateKey,
+      );
       await repository.upsertCompletion(
         taskId: taskId,
         userId: userId,
         localDateKey: localDateKey,
         status: status,
       );
+      // Award points when a completion transitions to done (only award once)
+      if (status == CompletionStatus.done && (previous == null || previous.status != CompletionStatus.done)) {
+        try {
+          await ScoreService().awardCompletion(userId: userId);
+        } catch (_) {
+          // Non-fatal: scoring is best-effort from client. Do not block UI on failure.
+        }
+      }
       _showSnack(status == CompletionStatus.done ? 'Marked done.' : 'Marked skipped.');
     } catch (error) {
       _showSnack('Failed to update completion: $error');

@@ -1,4 +1,6 @@
 import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/features/leaderboard/presentation/leaderboard_screen.dart';
+import 'package:coworkplace/features/leaderboard/data/score_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/features/friends/domain/friend_connection.dart';
@@ -22,7 +24,8 @@ import 'package:timezone/timezone.dart' as tz;
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  static final Future<PackageInfo> _packageInfoFuture = PackageInfo.fromPlatform();
+  static final Future<PackageInfo> _packageInfoFuture =
+      PackageInfo.fromPlatform();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,7 +33,8 @@ class HomeScreen extends ConsumerWidget {
 
     return sessionAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stackTrace) => Center(child: Text('Session error: $error')),
+      error: (error, stackTrace) =>
+          Center(child: Text('Session error: $error')),
       data: (session) {
         final profile = session.profile;
         final userId = session.userId;
@@ -40,7 +44,9 @@ class HomeScreen extends ConsumerWidget {
 
         if (Firebase.apps.isEmpty) {
           return const Center(
-            child: Text('Feed becomes available after Firebase is initialized.'),
+            child: Text(
+              'Feed becomes available after Firebase is initialized.',
+            ),
           );
         }
 
@@ -49,58 +55,69 @@ class HomeScreen extends ConsumerWidget {
         final taskRepository = ref.watch(taskRepositoryProvider);
         final completionRepository = ref.watch(completionRepositoryProvider);
 
-        return Stack(
-          children: [
-            ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _FriendFeedSection(
-                  profileRepository: profileRepository,
-                  taskRepository: taskRepository,
-                  completionRepository: completionRepository,
-                  friendStream: friendRepository.watchFriends(userId),
-                  currentUserId: userId,
-                  currentUserProfile: profile,
-                  currentFeedViewMode: profile.feedViewMode,
-                ),
-                const SizedBox(height: 56),
-              ],
-            ),
-            Positioned(
-              bottom: 12,
-              right: 12,
-              child: FutureBuilder<PackageInfo>(
-                future: _packageInfoFuture,
-                builder: (context, snap) {
-                  final versionText = snap.hasData
-                      ? 'v${snap.data!.version}'
-                      : 'v1.0.0';
-                  return DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface.withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.outline.withOpacity(0.35),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      child: Text(
-                        versionText,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withOpacity(0.82),
-                          fontWeight: FontWeight.w600,
+        return Scaffold(
+          appBar: AppBar(title: const Text('Home')),
+          body: Stack(
+            children: [
+              ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const _LeaderboardCard(),
+                  const SizedBox(height: 8),
+                  _FriendFeedSection(
+                    profileRepository: profileRepository,
+                    taskRepository: taskRepository,
+                    completionRepository: completionRepository,
+                    friendStream: friendRepository.watchFriends(userId),
+                    currentUserId: userId,
+                    currentUserProfile: profile,
+                    currentFeedViewMode: profile.feedViewMode,
+                  ),
+                  const SizedBox(height: 56),
+                ],
+              ),
+              Positioned(
+                bottom: 12,
+                right: 12,
+                child: FutureBuilder<PackageInfo>(
+                  future: _packageInfoFuture,
+                  builder: (context, snap) {
+                    final versionText = snap.hasData
+                        ? 'v${snap.data!.version}'
+                        : 'v1.0.0';
+                    return DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withOpacity(0.92),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outline.withOpacity(0.35),
                         ),
                       ),
-                    ),
-                  );
-                },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          versionText,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.82),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -130,6 +147,96 @@ class _FriendFeedSection extends ConsumerStatefulWidget {
   ConsumerState<_FriendFeedSection> createState() => _FriendFeedSectionState();
 }
 
+class _LeaderboardCard extends ConsumerWidget {
+  const _LeaderboardCard({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(appSessionProvider).valueOrNull;
+    final myId = session?.userId;
+    if (myId == null) return const SizedBox.shrink();
+
+    final friendRepo = ref.read(friendRepositoryProvider);
+    final profileRepo = ref.read(userProfileRepositoryProvider);
+    final service = ScoreService();
+    final periodId = service.weekPeriodId(DateTime.now().toUtc());
+
+    return StreamBuilder<List<dynamic>>(
+      stream: friendRepo.watchFriends(myId),
+      builder: (context, friendSnap) {
+        if (friendSnap.hasError) return const SizedBox.shrink();
+        if (!friendSnap.hasData) return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Center(child: CircularProgressIndicator()),
+        );
+
+        final friends = friendSnap.data!;
+        final friendIds = friends.map((f) => f.friendUserId as String).toSet();
+        friendIds.add(myId);
+
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: service.getScoresForUsers(periodId: periodId, userIds: friendIds),
+          builder: (context, scoresSnap) {
+            if (scoresSnap.hasError) return const SizedBox.shrink();
+            if (scoresSnap.connectionState == ConnectionState.waiting) return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(child: CircularProgressIndicator()),
+            );
+
+            final docs = scoresSnap.data ?? <Map<String, dynamic>>[];
+            if (docs.isEmpty) {
+              return Card(
+                child: ListTile(
+                  title: const Text('Weekly Top'),
+                  subtitle: const Text('No leaderboard data yet.'),
+                  onTap: () {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeaderboardScreen()));
+                  },
+                ),
+              );
+            }
+
+            final top = docs.first;
+            final topId = top['userId'] as String;
+            final points = top['points'] as int;
+
+            return FutureBuilder<List<UserProfile>>(
+              future: profileRepo.getByIds([topId]),
+              builder: (context, profilesSnap) {
+                if (profilesSnap.connectionState == ConnectionState.waiting) return const Card(
+                  child: ListTile(
+                    title: Text('Weekly Top'),
+                    subtitle: Text('Loading...'),
+                  ),
+                );
+
+                final profiles = profilesSnap.data ?? <UserProfile>[];
+                final profile = profiles.isNotEmpty ? profiles.first : null;
+                final display = profile?.displayName ?? topId;
+                final username = profile != null ? '@${profile.username}' : topId;
+
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      child: Text(profile != null && profile.displayName.isNotEmpty ? profile.displayName[0].toUpperCase() : '?'),
+                    ),
+                    title: const Text('Weekly Top'),
+                    subtitle: Text('$display • $username'),
+                    trailing: Text('$points pts'),
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeaderboardScreen()));
+                    },
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
   static const _timeService = DayStartTimeService();
   // Grid mode is temporarily disabled — force list view.
@@ -150,10 +257,7 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Today',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text('Today', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             _FriendFeedTile(
               profile: widget.currentUserProfile,
@@ -196,7 +300,9 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
                   ),
                   builder: (context, profileSnapshot) {
                     if (profileSnapshot.hasError) {
-                      return Text('Failed to load friend profiles: ${profileSnapshot.error}');
+                      return Text(
+                        'Failed to load friend profiles: ${profileSnapshot.error}',
+                      );
                     }
 
                     if (!profileSnapshot.hasData) {
@@ -212,12 +318,13 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: profiles.length,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 1.35,
-                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              childAspectRatio: 1.35,
+                            ),
                         itemBuilder: (context, index) {
                           return _FriendFeedTile(
                             profile: profiles[index],
@@ -240,7 +347,9 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
                           completionRepository: widget.completionRepository,
                           localDateKeyResolver: _resolveLocalDateKey,
                           compact: false,
-                          isSelf: false,                        viewerTimezone: widget.currentUserProfile.timezone,                        );
+                          isSelf: false,
+                          viewerTimezone: widget.currentUserProfile.timezone,
+                        );
                       }).toList(),
                     );
                   },
@@ -263,9 +372,9 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
     }
 
     try {
-      await ref.read(userProfileRepositoryProvider).upsert(
-            profile.copyWith(feedViewMode: nextMode),
-          );
+      await ref
+          .read(userProfileRepositoryProvider)
+          .upsert(profile.copyWith(feedViewMode: nextMode));
       ref.invalidate(appSessionProvider);
     } catch (_) {
       // Keep UI responsive even if this persistence attempt fails.
@@ -319,7 +428,9 @@ class _FriendFeedTile extends StatelessWidget {
           );
         }
 
-        final activeTasks = taskSnapshot.data!.where((task) => task.active).toList();
+        final activeTasks = taskSnapshot.data!
+            .where((task) => task.active)
+            .toList();
         final localDateKey = localDateKeyResolver(profile);
 
         return StreamBuilder<List<TaskCompletion>>(
@@ -328,14 +439,19 @@ class _FriendFeedTile extends StatelessWidget {
             localDateKey: localDateKey,
           ),
           builder: (context, completionSnapshot) {
-            final completions = completionSnapshot.data ?? const <TaskCompletion>[];
+            final completions =
+                completionSnapshot.data ?? const <TaskCompletion>[];
             final completionByTaskId = {
-              for (final completion in completions) completion.taskId: completion,
+              for (final completion in completions)
+                completion.taskId: completion,
             };
-            final doneCount =
-                completions.where((item) => item.status == CompletionStatus.done).length;
+            final doneCount = completions
+                .where((item) => item.status == CompletionStatus.done)
+                .length;
             final totalCount = activeTasks.length;
-            final firstTaskTitle = activeTasks.isEmpty ? 'No active task' : activeTasks.first.title;
+            final firstTaskTitle = activeTasks.isEmpty
+                ? 'No active task'
+                : activeTasks.first.title;
             final summary = '$doneCount/$totalCount done • $firstTaskTitle';
             return _buildExpandableCard(
               context: context,
@@ -402,12 +518,22 @@ class _FriendFeedTile extends StatelessWidget {
             Text(summary),
             const SizedBox(height: 8),
             // Progress bar: completed vs total
-            Builder(builder: (context) {
-              final doneCount = completionByTaskId.values.where((c) => c.status == CompletionStatus.done).length;
-              final totalCount = activeTasks.length;
-              final percent = totalCount == 0 ? 0.0 : (doneCount / totalCount).clamp(0.0, 1.0);
-              return TaskCompletionBar(percent: percent, done: doneCount, total: totalCount);
-            }),
+            Builder(
+              builder: (context) {
+                final doneCount = completionByTaskId.values
+                    .where((c) => c.status == CompletionStatus.done)
+                    .length;
+                final totalCount = activeTasks.length;
+                final percent = totalCount == 0
+                    ? 0.0
+                    : (doneCount / totalCount).clamp(0.0, 1.0);
+                return TaskCompletionBar(
+                  percent: percent,
+                  done: doneCount,
+                  total: totalCount,
+                );
+              },
+            ),
             const SizedBox(height: 6),
             Text('Day start: ${_formatDayStartForViewer(viewerTimezone)}'),
           ],
@@ -494,7 +620,9 @@ class _FriendFeedTile extends StatelessWidget {
       final formatted = DateFormat('hh:mm a').format(viewerDayStart);
       return formatted;
     } catch (_) {
-      return DateFormat('hh:mm a').format(DateTime(2000, 1, 1, profile.dayStartHour, 0));
+      return DateFormat(
+        'hh:mm a',
+      ).format(DateTime(2000, 1, 1, profile.dayStartHour, 0));
     }
   }
 
@@ -535,9 +663,7 @@ class _FriendFeedTile extends StatelessWidget {
   void _openProfile(BuildContext context) {
     if (isSelf) {
       Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const PersonalProfileScreen(),
-        ),
+        MaterialPageRoute<void>(builder: (_) => const PersonalProfileScreen()),
       );
       return;
     }
@@ -551,7 +677,12 @@ class _FriendFeedTile extends StatelessWidget {
 }
 
 class TaskCompletionBar extends StatelessWidget {
-  const TaskCompletionBar({required this.percent, required this.done, required this.total, super.key});
+  const TaskCompletionBar({
+    required this.percent,
+    required this.done,
+    required this.total,
+    super.key,
+  });
 
   final double percent;
   final int done;
@@ -573,29 +704,34 @@ class TaskCompletionBar extends StatelessWidget {
             color: bgColor,
             borderRadius: BorderRadius.circular(6),
           ),
-          child: LayoutBuilder(builder: (context, constraints) {
-            return Align(
-              alignment: Alignment.centerLeft,
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.0, end: percent),
-                duration: const Duration(milliseconds: 400),
-                builder: (context, value, child) {
-                  return FractionallySizedBox(
-                    widthFactor: value,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: fillColor,
-                        borderRadius: BorderRadius.circular(6),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: percent),
+                  duration: const Duration(milliseconds: 400),
+                  builder: (context, value, child) {
+                    return FractionallySizedBox(
+                      widthFactor: value,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: fillColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            );
-          }),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
         ),
         const SizedBox(height: 6),
-        Text('${(percent * 100).round()}% • $done / $total', style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          '${(percent * 100).round()}% • $done / $total',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ],
     );
   }
