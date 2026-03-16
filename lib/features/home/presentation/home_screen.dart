@@ -1,7 +1,7 @@
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/features/leaderboard/presentation/leaderboard_screen.dart';
+import 'package:coworkplace/core/app_constants.dart';
 import 'package:coworkplace/features/leaderboard/data/score_service.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/features/friends/domain/friend_connection.dart';
 import 'package:coworkplace/features/friends/presentation/friend_profile_screen.dart';
@@ -23,9 +23,6 @@ import 'package:timezone/timezone.dart' as tz;
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
-
-  static final Future<PackageInfo> _packageInfoFuture =
-      PackageInfo.fromPlatform();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -78,41 +75,33 @@ class HomeScreen extends ConsumerWidget {
               Positioned(
                 bottom: 12,
                 right: 12,
-                child: FutureBuilder<PackageInfo>(
-                  future: _packageInfoFuture,
-                  builder: (context, snap) {
-                    final versionText = snap.hasData
-                        ? 'v${snap.data!.version}'
-                        : 'v1.0.0';
-                    return DecoratedBox(
-                      decoration: BoxDecoration(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surface.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outline.withOpacity(0.35),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      'v${AppConstants.appVersion}',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: Theme.of(
                           context,
-                        ).colorScheme.surface.withOpacity(0.92),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.outline.withOpacity(0.35),
-                        ),
+                        ).colorScheme.onSurface.withOpacity(0.82),
+                        fontWeight: FontWeight.w600,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        child: Text(
-                          versionText,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withOpacity(0.82),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -212,7 +201,6 @@ class _LeaderboardCard extends ConsumerWidget {
                 final profiles = profilesSnap.data ?? <UserProfile>[];
                 final profile = profiles.isNotEmpty ? profiles.first : null;
                 final display = profile?.displayName ?? topId;
-                final username = profile != null ? '@${profile.username}' : topId;
 
                 return Card(
                   child: ListTile(
@@ -220,7 +208,7 @@ class _LeaderboardCard extends ConsumerWidget {
                       child: Text(profile != null && profile.displayName.isNotEmpty ? profile.displayName[0].toUpperCase() : '?'),
                     ),
                     title: const Text('Weekly Top'),
-                    subtitle: Text('$display • $username'),
+                    subtitle: Text(display),
                     trailing: Text('$points pts'),
                     onTap: () {
                       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LeaderboardScreen()));

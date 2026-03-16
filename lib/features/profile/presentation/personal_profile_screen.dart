@@ -1,3 +1,5 @@
+
+
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/features/auth/providers/auth_providers.dart';
@@ -10,9 +12,11 @@ import 'package:coworkplace/features/settings/presentation/settings_screen.dart'
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
+import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -114,7 +118,8 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final myTasks = taskSnapshot.data!.where((task) => task.active).toList();
+              final data = taskSnapshot.data ?? [];
+              final myTasks = data.where((task) => task.active).toList();
               final visibleTasks = _applyFilter(myTasks, _filter);
 
               return StreamBuilder<List<TaskCompletion>>(
@@ -1180,33 +1185,6 @@ class _AccountSecurityCard extends StatelessWidget {
   }
 }
 
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.profile});
-
-  final UserProfile profile;
-
-  String _formatDayStart(int dayStartHour) {
-    final dt = DateTime(2000, 1, 1, dayStartHour, 0);
-    return DateFormat('hh:mm a').format(dt);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          child: Text(
-            profile.displayName.isEmpty ? '?' : profile.displayName[0].toUpperCase(),
-          ),
-        ),
-        title: Text(profile.displayName),
-        subtitle: Text(
-          '@${profile.username} • ${profile.timezone} • Start ${_formatDayStart(profile.dayStartHour)} • ${profile.currentMode?.label ?? 'No mode set'}',
-        ),
-      ),
-    );
-  }
-}
 
 class _TimePickerRow extends StatelessWidget {
   const _TimePickerRow({required this.label, required this.onPick, this.onClear});
@@ -1243,6 +1221,152 @@ extension _TaskFilterLabel on _TaskFilter {
 }
 
 enum _TaskAction { done, skipped, edit, archive }
+
+class _ProfileHeader extends ConsumerStatefulWidget {
+  const _ProfileHeader({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  ConsumerState<_ProfileHeader> createState() => _ProfileHeaderState();
+}
+
+class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
+  MemoryImage? _cachedImage;
+  String? _cachedBase64;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateCache();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profile.photoBase64 != widget.profile.photoBase64) {
+      _updateCache();
+    }
+  }
+
+  void _updateCache() {
+    final base64 = widget.profile.photoBase64;
+    if (base64 == null) {
+      _cachedImage = null;
+      _cachedBase64 = null;
+    } else if (base64 != _cachedBase64) {
+      _cachedBase64 = base64;
+      _cachedImage = MemoryImage(base64Decode(base64));
+    }
+  }
+
+  Future<void> _pickAndUploadPhoto(BuildContext context, WidgetRef ref) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 256,
+      maxHeight: 256,
+    );
+    if (file == null) return;
+
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('Processing photo...')));
+
+    try {
+      final bytes = await file.readAsBytes();
+      final base64String = base64Encode(bytes);
+
+      if (base64String.length > 500000) {
+        messenger.showSnackBar(const SnackBar(content: Text('Image is too large. Please select a smaller photo.')));
+        return;
+      }
+
+      final updatedProfile = widget.profile.copyWith(photoBase64: base64String);
+      await ref.read(userProfileRepositoryProvider).upsert(updatedProfile);
+      
+      if (context.mounted) {
+        setState(() {
+          _cachedBase64 = base64String;
+          _cachedImage = MemoryImage(base64Decode(base64String));
+        });
+        messenger.showSnackBar(const SnackBar(content: Text('Photo updated successfully!')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('Error updating photo: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.profile;
+    return Row(
+      children: [
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            InkWell(
+              onTap: () => _pickAndUploadPhoto(context, ref),
+              borderRadius: BorderRadius.circular(36),
+              child: CircleAvatar(
+                radius: 36,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                backgroundImage: _cachedImage,
+                child: _cachedImage == null
+                    ? Text(
+                        profile.displayName.isNotEmpty
+                            ? profile.displayName[0].toUpperCase()
+                            : '?',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                      )
+                    : null,
+              ),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.camera_alt,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                profile.displayName,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              Text(
+                '@${profile.username}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _TaskDraft {
   const _TaskDraft({

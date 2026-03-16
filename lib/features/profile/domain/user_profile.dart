@@ -13,6 +13,7 @@ class UserProfile {
     this.currentMode,
     this.isOnline = false,
     this.lastSeenAtUtc,
+    this.photoBase64,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class UserProfile {
   final UserCurrentMode? currentMode;
   final bool isOnline;
   final DateTime? lastSeenAtUtc;
+  final String? photoBase64;
 
   UserProfile copyWith({
     String? displayName,
@@ -38,9 +40,11 @@ class UserProfile {
     UserCurrentMode? currentMode,
     bool? isOnline,
     DateTime? lastSeenAtUtc,
+    String? photoBase64,
     bool clearActiveGroupId = false,
     bool clearCurrentMode = false,
     bool clearLastSeenAtUtc = false,
+    bool clearPhotoBase64 = false,
   }) {
     return UserProfile(
       id: id,
@@ -58,6 +62,7 @@ class UserProfile {
       lastSeenAtUtc: clearLastSeenAtUtc
           ? null
           : (lastSeenAtUtc ?? this.lastSeenAtUtc),
+      photoBase64: clearPhotoBase64 ? null : (photoBase64 ?? this.photoBase64),
     );
   }
 
@@ -74,6 +79,7 @@ class UserProfile {
       'currentMode': currentMode?.toMap(),
       'isOnline': isOnline,
       'lastSeenAtUtc': lastSeenAtUtc?.toIso8601String(),
+      'photoBase64': photoBase64,
     };
   }
 
@@ -98,6 +104,7 @@ class UserProfile {
     final rawLastSeenAtUtc = map['lastSeenAtUtc'] as String?;
     final rawUsername = (map['username'] as String?)?.trim();
     final fallbackDisplayName = (map['displayName'] as String?)?.trim() ?? '';
+    final rawPhotoBase64 = map['photoBase64'] as String?;
 
     return UserProfile(
       id: map['id'] as String,
@@ -113,10 +120,11 @@ class UserProfile {
       currentMode: map['currentMode'] == null
           ? null
           : UserCurrentMode.fromMap(map['currentMode'] as Map<String, dynamic>),
-        isOnline: parsedIsOnline,
-        lastSeenAtUtc: rawLastSeenAtUtc == null
+      isOnline: parsedIsOnline,
+      lastSeenAtUtc: rawLastSeenAtUtc == null
           ? null
           : DateTime.parse(rawLastSeenAtUtc).toUtc(),
+      photoBase64: rawPhotoBase64?.isEmpty == true ? null : rawPhotoBase64,
     );
   }
 
