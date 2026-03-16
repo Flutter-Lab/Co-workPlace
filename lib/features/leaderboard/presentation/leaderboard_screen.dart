@@ -3,6 +3,7 @@ import 'package:coworkplace/features/leaderboard/data/score_service.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
+import 'package:coworkplace/core/widgets/user_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -150,14 +151,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                                     : '$points pts';
 
                                 return ListTile(
-                                  leading: CircleAvatar(
-                                    child: Text(
-                                      profile?.displayName.isNotEmpty == true
-                                          ? profile!.displayName[0]
-                                                .toUpperCase()
-                                          : '?',
-                                    ),
-                                  ),
+                                  leading: UserAvatar(profile: profile, radius: 20),
                                   title: Text(title),
                                   subtitle: Text(subtitle),
                                   trailing: Text('$points'),

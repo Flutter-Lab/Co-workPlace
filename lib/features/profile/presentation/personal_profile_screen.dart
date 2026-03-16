@@ -12,6 +12,7 @@ import 'package:coworkplace/features/settings/presentation/settings_screen.dart'
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
+import 'package:coworkplace/core/widgets/user_avatar.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -1232,34 +1233,6 @@ class _ProfileHeader extends ConsumerStatefulWidget {
 }
 
 class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
-  MemoryImage? _cachedImage;
-  String? _cachedBase64;
-
-  @override
-  void initState() {
-    super.initState();
-    _updateCache();
-  }
-
-  @override
-  void didUpdateWidget(covariant _ProfileHeader oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.profile.photoBase64 != widget.profile.photoBase64) {
-      _updateCache();
-    }
-  }
-
-  void _updateCache() {
-    final base64 = widget.profile.photoBase64;
-    if (base64 == null) {
-      _cachedImage = null;
-      _cachedBase64 = null;
-    } else if (base64 != _cachedBase64) {
-      _cachedBase64 = base64;
-      _cachedImage = MemoryImage(base64Decode(base64));
-    }
-  }
-
   Future<void> _pickAndUploadPhoto(BuildContext context, WidgetRef ref) async {
     final picker = ImagePicker();
     final file = await picker.pickImage(
@@ -1287,10 +1260,6 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
       await ref.read(userProfileRepositoryProvider).upsert(updatedProfile);
       
       if (context.mounted) {
-        setState(() {
-          _cachedBase64 = base64String;
-          _cachedImage = MemoryImage(base64Decode(base64String));
-        });
         messenger.showSnackBar(const SnackBar(content: Text('Photo updated successfully!')));
       }
     } catch (e) {
@@ -1305,31 +1274,14 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
     final profile = widget.profile;
     return Row(
       children: [
-        SizedBox(
-          width: 72,
-          height: 72,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              InkWell(
-                onTap: () => _pickAndUploadPhoto(context, ref),
-                borderRadius: BorderRadius.circular(36),
-                child: CircleAvatar(
-                  radius: 36,
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                  backgroundImage: _cachedImage,
-                  child: _cachedImage == null
-                      ? Text(
-                          profile.displayName.isNotEmpty
-                              ? profile.displayName[0].toUpperCase()
-                              : '?',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                              ),
-                        )
-                      : null,
-                ),
-              ),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            InkWell(
+              onTap: () => _pickAndUploadPhoto(context, ref),
+              borderRadius: BorderRadius.circular(36),
+              child: UserAvatar(profile: profile, radius: 36),
+            ),
               Positioned(
                 right: 0,
                 bottom: 0,
@@ -1348,7 +1300,6 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
               ),
             ],
           ),
-        ),
         const SizedBox(width: 16),
         Expanded(
           child: Column(

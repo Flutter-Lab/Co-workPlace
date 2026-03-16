@@ -15,6 +15,7 @@ import 'package:coworkplace/features/tasks/data/task_repository.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
+import 'package:coworkplace/core/widgets/user_avatar.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -204,9 +205,7 @@ class _LeaderboardCard extends ConsumerWidget {
 
                 return Card(
                   child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(profile != null && profile.displayName.isNotEmpty ? profile.displayName[0].toUpperCase() : '?'),
-                    ),
+                    leading: UserAvatar(profile: profile, radius: 20),
                     title: const Text('Weekly Top'),
                     subtitle: Text(display),
                     trailing: Text('$points pts'),
@@ -471,13 +470,7 @@ class _FriendFeedTile extends StatelessWidget {
         leading: Stack(
           clipBehavior: Clip.none,
           children: [
-            CircleAvatar(
-              child: Text(
-                profile.displayName.isEmpty
-                    ? '?'
-                    : profile.displayName[0].toUpperCase(),
-              ),
-            ),
+            UserAvatar(profile: profile, radius: 20),
             Positioned(
               right: -1,
               bottom: -1,

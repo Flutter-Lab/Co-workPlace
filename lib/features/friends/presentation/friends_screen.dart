@@ -9,6 +9,7 @@ import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
+import 'package:coworkplace/core/widgets/user_avatar.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -130,9 +131,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                             );
                             return Card(
                               child: ListTile(
-                                leading: CircleAvatar(
-                                  child: Text(otherProfile.displayName.isEmpty ? '?' : otherProfile.displayName[0].toUpperCase()),
-                                ),
+                                leading: UserAvatar(profile: otherProfile, radius: 20),
                                 title: Text(otherProfile.displayName),
                                 subtitle: Text('@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}'),
                                 isThreeLine: false,
@@ -168,9 +167,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                             );
                             return Card(
                               child: ListTile(
-                                leading: CircleAvatar(
-                                  child: Text(otherProfile.displayName.isEmpty ? '?' : otherProfile.displayName[0].toUpperCase()),
-                                ),
+                                leading: UserAvatar(profile: otherProfile, radius: 20),
                                 title: Text(otherProfile.displayName),
                                 subtitle: Text('@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}'),
                                 trailing: TextButton(
@@ -194,9 +191,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                             );
                             return Card(
                               child: ListTile(
-                                leading: CircleAvatar(
-                                  child: Text(otherProfile.displayName.isEmpty ? '?' : otherProfile.displayName[0].toUpperCase()),
-                                ),
+                                leading: UserAvatar(profile: otherProfile, radius: 20),
                                 title: Text(otherProfile.displayName),
                                 subtitle: Text(
                                   '@${otherProfile.username} • ${otherProfile.currentMode?.label ?? 'No mode set'}',

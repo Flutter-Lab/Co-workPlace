@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:coworkplace/features/profile/presentation/task_history_screen.dart';
+import 'package:coworkplace/core/widgets/user_avatar.dart';
 
 class FriendProfileScreen extends ConsumerWidget {
   const FriendProfileScreen({
@@ -83,13 +84,7 @@ class FriendProfileScreen extends ConsumerWidget {
                 children: [
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      child: Text(
-                        profile.displayName.isEmpty
-                            ? '?'
-                            : profile.displayName[0].toUpperCase(),
-                      ),
-                    ),
+                    leading: UserAvatar(profile: profile, radius: 20),
                     title: Text(profile.displayName),
                     subtitle: Text('@${profile.username}'),
                   ),
