@@ -56,7 +56,6 @@ class HomeScreen extends ConsumerWidget {
         final completionRepository = ref.watch(completionRepositoryProvider);
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Home')),
           body: Stack(
             children: [
               ListView(
