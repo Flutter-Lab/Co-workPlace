@@ -41,14 +41,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             padding: const EdgeInsets.all(8.0),
             child: SegmentedButton<String>(
               segments: const [
-                ButtonSegment<String>(
-                  value: 'weekly',
-                  label: Text('Weekly'),
-                ),
-                ButtonSegment<String>(
-                  value: 'monthly',
-                  label: Text('Monthly'),
-                ),
+                ButtonSegment<String>(value: 'weekly', label: Text('Weekly')),
+                ButtonSegment<String>(value: 'monthly', label: Text('Monthly')),
                 ButtonSegment<String>(
                   value: 'alltime',
                   label: Text('All-time'),
@@ -65,10 +59,11 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           Expanded(
             child: Builder(
               builder: (context) {
-                if (myId == null)
+                if (myId == null) {
                   return const Center(
                     child: Text('Sign in to view leaderboard'),
                   );
+                }
 
                 final friendRepo = ref.read(friendRepositoryProvider);
 
@@ -76,10 +71,12 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 return StreamBuilder<List<dynamic>>(
                   stream: friendRepo.watchFriends(myId),
                   builder: (context, friendSnap) {
-                    if (friendSnap.hasError)
+                    if (friendSnap.hasError) {
                       return Center(child: Text('Failed: ${friendSnap.error}'));
-                    if (!friendSnap.hasData)
+                    }
+                    if (!friendSnap.hasData) {
                       return const Center(child: CircularProgressIndicator());
+                    }
 
                     final friends = friendSnap.data!;
                     final friendIds = friends
@@ -93,22 +90,25 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                         userIds: friendIds,
                       ),
                       builder: (context, scoresSnap) {
-                        if (scoresSnap.hasError)
+                        if (scoresSnap.hasError) {
                           return Center(
                             child: Text('Failed: ${scoresSnap.error}'),
                           );
+                        }
                         if (scoresSnap.connectionState ==
-                            ConnectionState.waiting)
+                            ConnectionState.waiting) {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
+                        }
 
                         final docs =
                             scoresSnap.data ?? <Map<String, dynamic>>[];
-                        if (docs.isEmpty)
+                        if (docs.isEmpty) {
                           return const Center(
                             child: Text('No leaderboard data yet.'),
                           );
+                        }
 
                         final userIds = docs
                             .map((d) => d['userId'] as String)
@@ -118,15 +118,17 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                         return FutureBuilder<List<UserProfile>>(
                           future: repo.getByIds(userIds),
                           builder: (context, profilesSnap) {
-                            if (profilesSnap.hasError)
+                            if (profilesSnap.hasError) {
                               return Center(
                                 child: Text('Failed: ${profilesSnap.error}'),
                               );
+                            }
                             if (profilesSnap.connectionState ==
-                                ConnectionState.waiting)
+                                ConnectionState.waiting) {
                               return const Center(
                                 child: CircularProgressIndicator(),
                               );
+                            }
 
                             final profiles =
                                 profilesSnap.data ?? <UserProfile>[];
@@ -137,7 +139,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                             // Build ranked list UI
                             return ListView.separated(
                               itemCount: docs.length,
-                              separatorBuilder: (_, __) =>
+                              separatorBuilder: (_, _) =>
                                   const Divider(height: 1),
                               itemBuilder: (context, index) {
                                 final item = docs[index];
@@ -151,7 +153,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                                     : '$points pts';
 
                                 return ListTile(
-                                  leading: UserAvatar(profile: profile, radius: 20),
+                                  leading: UserAvatar(
+                                    profile: profile,
+                                    radius: 20,
+                                  ),
                                   title: Text(title),
                                   subtitle: Text(subtitle),
                                   trailing: Text('$points'),

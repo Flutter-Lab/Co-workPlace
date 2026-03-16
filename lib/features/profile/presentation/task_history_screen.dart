@@ -32,7 +32,9 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
     super.initState();
     _dateKeys = _generateDateKeys(31);
     final sorted = List.of(_dateKeys)..sort();
-    _historyFuture = ref.read(completionRepositoryProvider).getCompletionsForDateRange(
+    _historyFuture = ref
+        .read(completionRepositoryProvider)
+        .getCompletionsForDateRange(
           userId: widget.userId,
           fromDateKey: sorted.first,
           toDateKey: sorted.last,
@@ -53,11 +55,14 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
           return FutureBuilder<List<TaskCompletion>>(
             future: _historyFuture,
             builder: (context, snap) {
-              if (taskSnapshot.connectionState == ConnectionState.waiting || snap.connectionState == ConnectionState.waiting) {
+              if (taskSnapshot.connectionState == ConnectionState.waiting ||
+                  snap.connectionState == ConnectionState.waiting) {
                 return _buildLoadingList();
               }
               if (snap.hasError) {
-                return Center(child: Text('Failed to load history: ${snap.error}'));
+                return Center(
+                  child: Text('Failed to load history: ${snap.error}'),
+                );
               }
 
               final completions = snap.data ?? const <TaskCompletion>[];
@@ -66,8 +71,9 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
                 byDate.putIfAbsent(c.localDateKey, () => []).add(c);
               }
 
-              final activeDates =
-                  _dateKeys.where((k) => byDate.containsKey(k)).toList();
+              final activeDates = _dateKeys
+                  .where((k) => byDate.containsKey(k))
+                  .toList();
 
               if (activeDates.isEmpty) {
                 return const Center(child: Text('No task history yet.'));
@@ -96,19 +102,35 @@ class _TaskHistoryScreenState extends ConsumerState<TaskHistoryScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: 5,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         return Card(
           margin: EdgeInsets.zero,
           child: ListTile(
-            leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: Theme.of(context).disabledColor.withOpacity(0.2), shape: BoxShape.circle)),
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Theme.of(context).disabledColor.withAlpha(51),
+                shape: BoxShape.circle,
+              ),
+            ),
             title: Align(
               alignment: Alignment.centerLeft,
-              child: Container(width: 150, height: 12, color: Theme.of(context).disabledColor.withOpacity(0.2)),
+              child: Container(
+                width: 150,
+                height: 12,
+                color: Theme.of(context).disabledColor.withAlpha(51),
+              ),
             ),
             subtitle: Align(
               alignment: Alignment.centerLeft,
-              child: Container(width: 100, height: 10, margin: const EdgeInsets.only(top: 8), color: Theme.of(context).disabledColor.withOpacity(0.12)),
+              child: Container(
+                width: 100,
+                height: 10,
+                margin: const EdgeInsets.only(top: 8),
+                color: Theme.of(context).disabledColor.withAlpha(31),
+              ),
             ),
           ),
         );
@@ -155,8 +177,9 @@ class _DayHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final doneCount =
-        completions.where((c) => c.status == CompletionStatus.done).length;
+    final doneCount = completions
+        .where((c) => c.status == CompletionStatus.done)
+        .length;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -182,7 +205,8 @@ class _DayHistoryCard extends StatelessWidget {
               ),
               title: Text(task?.title ?? '(deleted task)'),
               subtitle: Text(
-                  c.status == CompletionStatus.done ? 'Done' : 'Skipped'),
+                c.status == CompletionStatus.done ? 'Done' : 'Skipped',
+              ),
               trailing: Text(
                 DateFormat('hh:mm a').format(c.completedAtUtc.toLocal()),
                 style: Theme.of(context).textTheme.bodySmall,
@@ -200,7 +224,9 @@ class _DayHistoryCard extends StatelessWidget {
       final date = DateTime.parse(key);
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final diff = today.difference(DateTime(date.year, date.month, date.day)).inDays;
+      final diff = today
+          .difference(DateTime(date.year, date.month, date.day))
+          .inDays;
       if (diff == 0) return 'Today';
       if (diff == 1) return 'Yesterday';
       return DateFormat('EEEE, MMM d').format(date);

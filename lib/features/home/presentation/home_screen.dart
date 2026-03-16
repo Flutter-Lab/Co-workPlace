@@ -82,14 +82,12 @@ class HomeScreen extends ConsumerWidget {
                 right: 12,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surface.withOpacity(0.92),
+                    color: Theme.of(context).colorScheme.surface.withAlpha(235),
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
                       color: Theme.of(
                         context,
-                      ).colorScheme.outline.withOpacity(0.35),
+                      ).colorScheme.outline.withAlpha(89),
                     ),
                   ),
                   child: Padding(
@@ -102,7 +100,7 @@ class HomeScreen extends ConsumerWidget {
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.82),
+                        ).colorScheme.onSurface.withAlpha(209),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -141,13 +139,15 @@ class _FriendFeedSection extends ConsumerStatefulWidget {
 }
 
 class _LeaderboardCard extends ConsumerWidget {
-  const _LeaderboardCard({Key? key}) : super(key: key);
+  const _LeaderboardCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(appSessionProvider).valueOrNull;
     final myId = session?.userId;
-    if (myId == null) return const SizedBox.shrink();
+    if (myId == null) {
+      return const SizedBox.shrink();
+    }
 
     final friendRepo = ref.read(friendRepositoryProvider);
     final profileRepo = ref.read(userProfileRepositoryProvider);
@@ -157,12 +157,15 @@ class _LeaderboardCard extends ConsumerWidget {
     return StreamBuilder<List<dynamic>>(
       stream: friendRepo.watchFriends(myId),
       builder: (context, friendSnap) {
-        if (friendSnap.hasError) return const SizedBox.shrink();
-        if (!friendSnap.hasData)
+        if (friendSnap.hasError) {
+          return const SizedBox.shrink();
+        }
+        if (!friendSnap.hasData) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Center(child: CircularProgressIndicator()),
           );
+        }
 
         final friends = friendSnap.data!;
         final friendIds = friends.map((f) => f.friendUserId as String).toSet();
@@ -174,12 +177,15 @@ class _LeaderboardCard extends ConsumerWidget {
             userIds: friendIds,
           ),
           builder: (context, scoresSnap) {
-            if (scoresSnap.hasError) return const SizedBox.shrink();
-            if (scoresSnap.connectionState == ConnectionState.waiting)
+            if (scoresSnap.hasError) {
+              return const SizedBox.shrink();
+            }
+            if (scoresSnap.connectionState == ConnectionState.waiting) {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Center(child: CircularProgressIndicator()),
               );
+            }
 
             final docs = scoresSnap.data ?? <Map<String, dynamic>>[];
             if (docs.isEmpty) {
@@ -205,13 +211,14 @@ class _LeaderboardCard extends ConsumerWidget {
             return FutureBuilder<List<UserProfile>>(
               future: profileRepo.getByIds([topId]),
               builder: (context, profilesSnap) {
-                if (profilesSnap.connectionState == ConnectionState.waiting)
+                if (profilesSnap.connectionState == ConnectionState.waiting) {
                   return const Card(
                     child: ListTile(
                       title: Text('Weekly Top'),
                       subtitle: Text('Loading...'),
                     ),
                   );
+                }
 
                 final profiles = profilesSnap.data ?? <UserProfile>[];
                 final profile = profiles.isNotEmpty ? profiles.first : null;
@@ -479,8 +486,10 @@ class _FriendFeedTile extends StatelessWidget {
     final isOnline = _isOnline(profile);
     final cardTitle = isSelf ? 'My Tasks' : profile.displayName;
 
-    Stream<int> _votesStreamAcrossTasks(List<Task> tasks, String ownerId) {
-      if (tasks.isEmpty) return Stream.value(0);
+    Stream<int> votesStreamAcrossTasks(List<Task> tasks, String ownerId) {
+      if (tasks.isEmpty) {
+        return Stream.value(0);
+      }
 
       return Stream.multi((controller) {
         final counts = List<int>.filled(tasks.length, 0);
@@ -547,10 +556,14 @@ class _FriendFeedTile extends StatelessWidget {
         title: Text(cardTitle),
         // Show total votes in the trailing when collapsed (live)
         trailing: StreamBuilder<int>(
-          stream: _votesStreamAcrossTasks(activeTasks, profile.id),
+          stream: votesStreamAcrossTasks(activeTasks, profile.id),
           builder: (context, snap) {
-            if (snap.hasError) return const SizedBox.shrink();
-            if (!snap.hasData) return const SizedBox.shrink();
+            if (snap.hasError) {
+              return const SizedBox.shrink();
+            }
+            if (!snap.hasData) {
+              return const SizedBox.shrink();
+            }
             final totalVotes = snap.data ?? 0;
             return Row(
               mainAxisSize: MainAxisSize.min,
@@ -761,7 +774,7 @@ class TaskCompletionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.06);
+    final bgColor = Theme.of(context).colorScheme.onSurface.withAlpha(15);
     final fillColor = percent >= 1.0
         ? Colors.green
         : Theme.of(context).colorScheme.primary;

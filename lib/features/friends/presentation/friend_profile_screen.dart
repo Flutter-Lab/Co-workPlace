@@ -33,10 +33,18 @@ class FriendProfileScreen extends ConsumerWidget {
           StreamBuilder<List<Task>>(
             stream: taskRepository.watchUserTasks(profile.id),
             builder: (context, taskSnapshot) {
-              if (taskSnapshot.hasError) return const SizedBox.shrink();
-              if (!taskSnapshot.hasData) return const SizedBox.shrink();
-              final activeTasks = taskSnapshot.data!.where((t) => t.active).toList();
-              if (activeTasks.isEmpty) return const SizedBox.shrink();
+              if (taskSnapshot.hasError) {
+                return const SizedBox.shrink();
+              }
+              if (!taskSnapshot.hasData) {
+                return const SizedBox.shrink();
+              }
+              final activeTasks = taskSnapshot.data!
+                  .where((t) => t.active)
+                  .toList();
+              if (activeTasks.isEmpty) {
+                return const SizedBox.shrink();
+              }
               return IconButton(
                 icon: const Icon(Icons.history),
                 tooltip: 'History',
@@ -60,14 +68,18 @@ class FriendProfileScreen extends ConsumerWidget {
         stream: taskRepository.watchUserTasks(profile.id),
         builder: (context, taskSnapshot) {
           if (taskSnapshot.hasError) {
-            return Center(child: Text('Failed to load tasks: ${taskSnapshot.error}'));
+            return Center(
+              child: Text('Failed to load tasks: ${taskSnapshot.error}'),
+            );
           }
 
           if (!taskSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final activeTasks = taskSnapshot.data!.where((task) => task.active).toList();
+          final activeTasks = taskSnapshot.data!
+              .where((task) => task.active)
+              .toList();
 
           return StreamBuilder<List<TaskCompletion>>(
             stream: completionRepository.watchUserCompletionsForDate(
@@ -75,7 +87,8 @@ class FriendProfileScreen extends ConsumerWidget {
               localDateKey: localDateKey,
             ),
             builder: (context, completionSnapshot) {
-              final completions = completionSnapshot.data ?? const <TaskCompletion>[];
+              final completions =
+                  completionSnapshot.data ?? const <TaskCompletion>[];
               final completionByTaskId = {
                 for (final item in completions) item.taskId: item,
               };
@@ -89,12 +102,18 @@ class FriendProfileScreen extends ConsumerWidget {
                     title: Text(profile.displayName),
                     subtitle: Text('@${profile.username}'),
                   ),
-                  Text('Current mode: ${profile.currentMode?.label ?? 'No mode set'}'),
+                  Text(
+                    'Current mode: ${profile.currentMode?.label ?? 'No mode set'}',
+                  ),
                   const SizedBox(height: 4),
-                  Text('Timezone: ${profile.timezone} • Owner day: $localDateKey'),
+                  Text(
+                    'Timezone: ${profile.timezone} • Owner day: $localDateKey',
+                  ),
                   if (friendSince != null) ...[
                     const SizedBox(height: 4),
-                    Text('Friends since: ${DateFormat('yyyy-MM-dd HH:mm').format(friendSince!.toLocal())}'),
+                    Text(
+                      'Friends since: ${DateFormat('yyyy-MM-dd HH:mm').format(friendSince!.toLocal())}',
+                    ),
                   ],
                   const SizedBox(height: 12),
                   if (activeTasks.isEmpty)
@@ -102,7 +121,9 @@ class FriendProfileScreen extends ConsumerWidget {
                       child: ListTile(
                         leading: Icon(Icons.inbox_outlined),
                         title: Text('No active tasks'),
-                        subtitle: Text('This friend has no active tasks right now.'),
+                        subtitle: Text(
+                          'This friend has no active tasks right now.',
+                        ),
                       ),
                     )
                   else
@@ -114,12 +135,15 @@ class FriendProfileScreen extends ConsumerWidget {
                             completion?.status == CompletionStatus.done
                                 ? Icons.check_circle
                                 : completion?.status == CompletionStatus.skipped
-                                    ? Icons.skip_next
-                                    : Icons.radio_button_unchecked,
+                                ? Icons.skip_next
+                                : Icons.radio_button_unchecked,
                           ),
                           title: Text(task.title),
                           subtitle: Text(_taskSubtitle(task, completion)),
-                          trailing: TaskVoteButton(ownerId: profile.id, taskId: task.id),
+                          trailing: TaskVoteButton(
+                            ownerId: profile.id,
+                            taskId: task.id,
+                          ),
                         ),
                       );
                     }),
@@ -148,8 +172,8 @@ class FriendProfileScreen extends ConsumerWidget {
     final statusText = completion == null
         ? 'Pending'
         : completion.status == CompletionStatus.done
-            ? 'Done'
-            : 'Skipped';
+        ? 'Done'
+        : 'Skipped';
     final typeText = task.type == TaskType.daily ? 'Daily' : 'One-time';
     final goalText = task.goalCount != null && task.goalUnit != null
         ? ' • ${task.goalCount} ${task.goalUnit}'

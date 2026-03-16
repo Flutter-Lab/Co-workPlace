@@ -1,5 +1,3 @@
-
-
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/features/auth/providers/auth_providers.dart';
@@ -25,7 +23,8 @@ class PersonalProfileScreen extends ConsumerStatefulWidget {
   const PersonalProfileScreen({super.key});
 
   @override
-  ConsumerState<PersonalProfileScreen> createState() => _PersonalProfileScreenState();
+  ConsumerState<PersonalProfileScreen> createState() =>
+      _PersonalProfileScreenState();
 }
 
 class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
@@ -58,7 +57,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
               final session = ref.read(appSessionProvider).valueOrNull;
               final profile = session?.profile;
               final userId = session?.userId;
-              if (profile == null || userId == null) return;
+              if (profile == null || userId == null) {
+                return;
+              }
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => TaskHistoryScreen(
@@ -75,9 +76,7 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const SettingsScreen(),
-                ),
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
               );
             },
           ),
@@ -85,7 +84,8 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
       ),
       body: sessionAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(child: Text('Session error: $error')),
+        error: (error, stackTrace) =>
+            Center(child: Text('Session error: $error')),
         data: (session) {
           final profile = session.profile;
           final userId = session.userId;
@@ -96,7 +96,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
 
           if (Firebase.apps.isEmpty) {
             return const Center(
-              child: Text('Data becomes available after Firebase is initialized.'),
+              child: Text(
+                'Data becomes available after Firebase is initialized.',
+              ),
             );
           }
 
@@ -112,7 +114,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
             stream: taskRepository.watchUserTasks(userId),
             builder: (context, taskSnapshot) {
               if (taskSnapshot.hasError) {
-                return Center(child: Text('Failed to load tasks: ${taskSnapshot.error}'));
+                return Center(
+                  child: Text('Failed to load tasks: ${taskSnapshot.error}'),
+                );
               }
 
               if (!taskSnapshot.hasData) {
@@ -137,9 +141,11 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                     );
                   }
 
-                  final completions = completionSnapshot.data ?? const <TaskCompletion>[];
+                  final completions =
+                      completionSnapshot.data ?? const <TaskCompletion>[];
                   final completionByTaskId = {
-                    for (final completion in completions) completion.taskId: completion,
+                    for (final completion in completions)
+                      completion.taskId: completion,
                   };
 
                   return Scaffold(
@@ -195,7 +201,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                             TextButton.icon(
                               style: TextButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                               ),
                               icon: const Icon(Icons.restart_alt, size: 18),
                               label: const Text('Reset Today'),
@@ -212,7 +220,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                             child: ListTile(
                               leading: Icon(Icons.inbox_outlined),
                               title: Text('No tasks yet'),
-                              subtitle: Text('Tap Add Task to create your first task.'),
+                              subtitle: Text(
+                                'Tap Add Task to create your first task.',
+                              ),
                             ),
                           )
                         else
@@ -221,21 +231,27 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                             return Card(
                               child: ListTile(
                                 leading: IconButton(
-                                  tooltip: completion?.status == CompletionStatus.done
+                                  tooltip:
+                                      completion?.status ==
+                                          CompletionStatus.done
                                       ? 'Mark pending'
                                       : 'Mark done',
                                   icon: Icon(
                                     completion?.status == CompletionStatus.done
                                         ? Icons.check_circle
-                                        : completion?.status == CompletionStatus.skipped
-                                            ? Icons.skip_next
-                                            : Icons.radio_button_unchecked,
-                                    color: completion?.status == CompletionStatus.done
+                                        : completion?.status ==
+                                              CompletionStatus.skipped
+                                        ? Icons.skip_next
+                                        : Icons.radio_button_unchecked,
+                                    color:
+                                        completion?.status ==
+                                            CompletionStatus.done
                                         ? Theme.of(context).colorScheme.primary
                                         : null,
                                   ),
                                   onPressed: () {
-                                    if (completion?.status == CompletionStatus.done) {
+                                    if (completion?.status ==
+                                        CompletionStatus.done) {
                                       _clearCompletion(
                                         taskId: task.id,
                                         userId: userId,
@@ -253,7 +269,10 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                                 ),
                                 title: Text(task.title),
                                 subtitle: Text(
-                                  _taskSubtitle(task: task, completion: completion),
+                                  _taskSubtitle(
+                                    task: task,
+                                    completion: completion,
+                                  ),
                                 ),
                                 trailing: PopupMenuButton<_TaskAction>(
                                   onSelected: (action) {
@@ -419,14 +438,17 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
         status: status,
       );
       // Award points when a completion transitions to done (only award once)
-      if (status == CompletionStatus.done && (previous == null || previous.status != CompletionStatus.done)) {
+      if (status == CompletionStatus.done &&
+          (previous == null || previous.status != CompletionStatus.done)) {
         try {
           await ScoreService().awardCompletion(userId: userId);
         } catch (_) {
           // Non-fatal: scoring is best-effort from client. Do not block UI on failure.
         }
       }
-      _showSnack(status == CompletionStatus.done ? 'Marked done.' : 'Marked skipped.');
+      _showSnack(
+        status == CompletionStatus.done ? 'Marked done.' : 'Marked skipped.',
+      );
     } catch (error) {
       _showSnack('Failed to update completion: $error');
     }
@@ -459,7 +481,8 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Reset Today'),
         content: const Text(
-            'This will clear all task completions for today. Continue?'),
+          'This will clear all task completions for today. Continue?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -472,7 +495,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      return;
+    }
     try {
       final repository = ref.read(completionRepositoryProvider);
       await repository.deleteCompletionsForDate(
@@ -487,14 +512,18 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
 
   Future<_TaskDraft?> _showTaskEditor({Task? task, required String timezone}) {
     final titleController = TextEditingController(text: task?.title ?? '');
-    final descriptionController = TextEditingController(text: task?.description ?? '');
+    final descriptionController = TextEditingController(
+      text: task?.description ?? '',
+    );
     final goalCountController = TextEditingController(
       text: task?.goalCount == null ? '' : task!.goalCount!.toString(),
     );
     final otherGoalUnitController = TextEditingController();
 
     var selectedType = task?.type ?? TaskType.daily;
-    TimeOfDay? selectedLocalTime = _timeOfDayFromMinutes(task?.localTimeMinutes);
+    TimeOfDay? selectedLocalTime = _timeOfDayFromMinutes(
+      task?.localTimeMinutes,
+    );
 
     DateTime? selectedOneTimeDate;
     TimeOfDay? selectedOneTimeTime;
@@ -586,7 +615,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: goalCountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Goal Count (Optional)',
                         hintText: 'e.g. 500, 10000, 45',
@@ -640,7 +671,8 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                           final picked = await showTimePicker(
                             context: context,
                             initialTime:
-                                selectedLocalTime ?? const TimeOfDay(hour: 9, minute: 0),
+                                selectedLocalTime ??
+                                const TimeOfDay(hour: 9, minute: 0),
                           );
                           if (picked == null) {
                             return;
@@ -698,7 +730,8 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                               final picked = await showTimePicker(
                                 context: context,
                                 initialTime:
-                                    selectedOneTimeTime ?? const TimeOfDay(hour: 9, minute: 0),
+                                    selectedOneTimeTime ??
+                                    const TimeOfDay(hour: 9, minute: 0),
                               );
                               if (picked == null) {
                                 return;
@@ -727,19 +760,25 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                               final title = titleController.text.trim();
                               if (title.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Title is required.')),
+                                  const SnackBar(
+                                    content: Text('Title is required.'),
+                                  ),
                                 );
                                 return;
                               }
 
-                              final rawGoalCount = goalCountController.text.trim();
+                              final rawGoalCount = goalCountController.text
+                                  .trim();
                               double? parsedGoalCount;
                               if (rawGoalCount.isNotEmpty) {
                                 parsedGoalCount = double.tryParse(rawGoalCount);
-                                if (parsedGoalCount == null || parsedGoalCount <= 0) {
+                                if (parsedGoalCount == null ||
+                                    parsedGoalCount <= 0) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Goal count must be a positive number.'),
+                                      content: Text(
+                                        'Goal count must be a positive number.',
+                                      ),
                                     ),
                                   );
                                   return;
@@ -748,26 +787,34 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
 
                               String? resolvedGoalUnit;
                               if (selectedGoalUnit == 'other') {
-                                resolvedGoalUnit = otherGoalUnitController.text.trim();
+                                resolvedGoalUnit = otherGoalUnitController.text
+                                    .trim();
                               } else {
                                 resolvedGoalUnit = selectedGoalUnit;
                               }
 
-                              if (resolvedGoalUnit != null && resolvedGoalUnit.isEmpty) {
+                              if (resolvedGoalUnit != null &&
+                                  resolvedGoalUnit.isEmpty) {
                                 resolvedGoalUnit = null;
                               }
 
-                              if (parsedGoalCount != null && resolvedGoalUnit == null) {
+                              if (parsedGoalCount != null &&
+                                  resolvedGoalUnit == null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please select a goal unit.')),
+                                  const SnackBar(
+                                    content: Text('Please select a goal unit.'),
+                                  ),
                                 );
                                 return;
                               }
 
-                              if (parsedGoalCount == null && resolvedGoalUnit != null) {
+                              if (parsedGoalCount == null &&
+                                  resolvedGoalUnit != null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Please enter goal count for selected unit.'),
+                                    content: Text(
+                                      'Please enter goal count for selected unit.',
+                                    ),
                                   ),
                                 );
                                 return;
@@ -777,27 +824,31 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                               if (selectedType == TaskType.oneTime &&
                                   selectedOneTimeDate != null &&
                                   selectedOneTimeTime != null) {
-                                scheduledTimeUtc = _timeService.convertOwnerLocalTimeToUtc(
-                                  year: selectedOneTimeDate!.year,
-                                  month: selectedOneTimeDate!.month,
-                                  day: selectedOneTimeDate!.day,
-                                  hour: selectedOneTimeTime!.hour,
-                                  minute: selectedOneTimeTime!.minute,
-                                  timezone: timezone,
-                                );
+                                scheduledTimeUtc = _timeService
+                                    .convertOwnerLocalTimeToUtc(
+                                      year: selectedOneTimeDate!.year,
+                                      month: selectedOneTimeDate!.month,
+                                      day: selectedOneTimeDate!.day,
+                                      hour: selectedOneTimeTime!.hour,
+                                      minute: selectedOneTimeTime!.minute,
+                                      timezone: timezone,
+                                    );
                               }
 
                               Navigator.of(context).pop(
                                 _TaskDraft(
                                   title: title,
-                                  description: descriptionController.text.trim().isEmpty
+                                  description:
+                                      descriptionController.text.trim().isEmpty
                                       ? null
                                       : descriptionController.text.trim(),
                                   type: selectedType,
-                                  localTimeMinutes: selectedType == TaskType.daily
+                                  localTimeMinutes:
+                                      selectedType == TaskType.daily
                                       ? _minutesFromTimeOfDay(selectedLocalTime)
                                       : null,
-                                  scheduledTimeUtc: selectedType == TaskType.oneTime
+                                  scheduledTimeUtc:
+                                      selectedType == TaskType.oneTime
                                       ? scheduledTimeUtc
                                       : null,
                                   goalCount: parsedGoalCount,
@@ -805,7 +856,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                                 ),
                               );
                             },
-                            child: Text(task == null ? 'Create Task' : 'Save Task'),
+                            child: Text(
+                              task == null ? 'Create Task' : 'Save Task',
+                            ),
                           ),
                         ),
                       ],
@@ -831,7 +884,10 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
     }
   }
 
-  String _safeLocalDateKey({required String timezone, required int dayStartHour}) {
+  String _safeLocalDateKey({
+    required String timezone,
+    required int dayStartHour,
+  }) {
     try {
       return _timeService.localDateKeyForUtcInstant(
         instantUtc: DateTime.now().toUtc(),
@@ -843,12 +899,15 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
     }
   }
 
-  String _taskSubtitle({required Task task, required TaskCompletion? completion}) {
+  String _taskSubtitle({
+    required Task task,
+    required TaskCompletion? completion,
+  }) {
     final statusText = completion == null
         ? 'Pending'
         : completion.status == CompletionStatus.done
-            ? 'Done'
-            : 'Skipped';
+        ? 'Done'
+        : 'Skipped';
 
     final typeText = task.type == TaskType.daily ? 'Daily' : 'One-time';
 
@@ -858,7 +917,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
     }
 
     if (task.type == TaskType.oneTime && task.scheduledTimeUtc != null) {
-      scheduleText = DateFormat('yyyy-MM-dd HH:mm').format(task.scheduledTimeUtc!.toLocal());
+      scheduleText = DateFormat(
+        'yyyy-MM-dd HH:mm',
+      ).format(task.scheduledTimeUtc!.toLocal());
     }
 
     final goalText = task.goalCount != null && task.goalUnit != null
@@ -901,7 +962,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _showUpgradeAccountDialog() async {
@@ -1028,9 +1091,11 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
       orElse: () => defaultModePresets.first,
     );
 
-    if (savedLabel != null && savedLabel.startsWith('${selectedPreset.label} - ')) {
-      modeDetailController.text =
-          savedLabel.substring('${selectedPreset.label} - '.length).trim();
+    if (savedLabel != null &&
+        savedLabel.startsWith('${selectedPreset.label} - ')) {
+      modeDetailController.text = savedLabel
+          .substring('${selectedPreset.label} - '.length)
+          .trim();
     }
 
     final result = await showModalBottomSheet<_ModeDraft>(
@@ -1115,8 +1180,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
     final preset = defaultModePresets.firstWhere(
       (p) => p.id == result.selectedPresetId,
     );
-    final modeLabel =
-        result.detail.isEmpty ? preset.label : '${preset.label} - ${result.detail}';
+    final modeLabel = result.detail.isEmpty
+        ? preset.label
+        : '${preset.label} - ${result.detail}';
 
     final updatedProfile = profile.copyWith(
       currentMode: UserCurrentMode(
@@ -1130,10 +1196,14 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
       final repository = ref.read(userProfileRepositoryProvider);
       await repository.upsert(updatedProfile);
       ref.invalidate(appSessionProvider);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       _showSnack('Current mode updated.');
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       _showSnack('Failed to update mode: $error');
     }
   }
@@ -1145,7 +1215,6 @@ class _ModeDraft {
   final String selectedPresetId;
   final String detail;
 }
-
 
 class _AccountSecurityCard extends StatelessWidget {
   const _AccountSecurityCard({
@@ -1180,15 +1249,20 @@ class _AccountSecurityCard extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.verified_user_outlined),
         title: const Text('Email Login Enabled'),
-        subtitle: Text(authUserEmail == null ? 'Linked account' : authUserEmail!),
+        subtitle: Text(
+          authUserEmail == null ? 'Linked account' : authUserEmail!,
+        ),
       ),
     );
   }
 }
 
-
 class _TimePickerRow extends StatelessWidget {
-  const _TimePickerRow({required this.label, required this.onPick, this.onClear});
+  const _TimePickerRow({
+    required this.label,
+    required this.onPick,
+    this.onClear,
+  });
 
   final String label;
   final VoidCallback onPick;
@@ -1200,7 +1274,8 @@ class _TimePickerRow extends StatelessWidget {
       children: [
         Expanded(child: Text(label)),
         TextButton(onPressed: onPick, child: const Text('Select')),
-        if (onClear != null) TextButton(onPressed: onClear, child: const Text('Clear')),
+        if (onClear != null)
+          TextButton(onPressed: onClear, child: const Text('Clear')),
       ],
     );
   }
@@ -1245,26 +1320,36 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
 
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Processing photo...')));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Processing photo...')),
+    );
 
     try {
       final bytes = await file.readAsBytes();
       final base64String = base64Encode(bytes);
 
       if (base64String.length > 500000) {
-        messenger.showSnackBar(const SnackBar(content: Text('Image is too large. Please select a smaller photo.')));
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Image is too large. Please select a smaller photo.'),
+          ),
+        );
         return;
       }
 
       final updatedProfile = widget.profile.copyWith(photoBase64: base64String);
       await ref.read(userProfileRepositoryProvider).upsert(updatedProfile);
-      
+
       if (context.mounted) {
-        messenger.showSnackBar(const SnackBar(content: Text('Photo updated successfully!')));
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Photo updated successfully!')),
+        );
       }
     } catch (e) {
       if (context.mounted) {
-        messenger.showSnackBar(SnackBar(content: Text('Error updating photo: $e')));
+        messenger.showSnackBar(
+          SnackBar(content: Text('Error updating photo: $e')),
+        );
       }
     }
   }
@@ -1282,24 +1367,24 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
               borderRadius: BorderRadius.circular(36),
               child: UserAvatar(profile: profile, radius: 36),
             ),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.camera_alt,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.camera_alt,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
@@ -1312,8 +1397,8 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
               Text(
                 '@${profile.username}',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
