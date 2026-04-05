@@ -8,16 +8,20 @@ import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/core/widgets/user_avatar.dart';
+import 'package:coworkplace/core/providers/vote_ticker_provider.dart';
+import 'package:coworkplace/core/cache/user_profile_cache.dart';
 
 class TaskVoteButton extends ConsumerStatefulWidget {
   const TaskVoteButton({
     super.key,
     required this.ownerId,
     required this.taskId,
+    this.showTransientVoters = false,
   });
 
   final String ownerId;
   final String taskId;
+  final bool showTransientVoters;
 
   @override
   ConsumerState<TaskVoteButton> createState() => _TaskVoteButtonState();
@@ -28,6 +32,7 @@ class _TaskVoteButtonState extends ConsumerState<TaskVoteButton>
   List<String> _lastVotes = [];
   List<UserProfile> _recentVoters = [];
   Timer? _clearTimer;
+  bool _isProcessing = false;
   late final AnimationController _pulseController;
 
   @override
@@ -56,25 +61,45 @@ class _TaskVoteButtonState extends ConsumerState<TaskVoteButton>
     }
 
     try {
+      // fetch voter profiles (small set) and owner name for ticker (cache-first)
       final profiles = await ref
-          .read(userProfileRepositoryProvider)
+          .read(userProfileCacheProvider)
           .getByIds(newVoters);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _recentVoters = profiles;
-      });
-      _pulseController.forward(from: 0.0);
-      _clearTimer?.cancel();
-      _clearTimer = Timer(const Duration(seconds: 3), () {
-        if (!mounted) {
-          return;
-        }
+      final voterName = profiles.isNotEmpty
+          ? profiles.first.displayName
+          : 'Someone';
+      String ownerName = 'their friend';
+      try {
+        final owners = await ref.read(userProfileCacheProvider).getByIds([
+          widget.ownerId,
+        ]);
+        if (owners.isNotEmpty) ownerName = owners.first.displayName;
+      } catch (_) {}
+
+      // announce via global ticker
+      try {
+        ref
+            .read(voteTickerProvider.notifier)
+            .announce(
+              "$voterName voted for $ownerName's task",
+              color: Colors.pink,
+            );
+      } catch (_) {}
+
+      if (widget.showTransientVoters) {
+        if (!mounted) return;
         setState(() {
-          _recentVoters = [];
+          _recentVoters = profiles;
         });
-      });
+        _pulseController.forward(from: 0.0);
+        _clearTimer?.cancel();
+        _clearTimer = Timer(const Duration(seconds: 3), () {
+          if (!mounted) return;
+          setState(() {
+            _recentVoters = [];
+          });
+        });
+      }
     } catch (_) {
       // ignore fetch errors for transient UI
     }
@@ -261,46 +286,143 @@ class _TaskVoteButtonState extends ConsumerState<TaskVoteButton>
                           size: 20,
                         ),
                       ),
-                      tooltip: hasVoted ? 'Voted' : 'Vote (+1 to friend)',
-                      onPressed: hasVoted
-                          ? null
-                          : () async {
-                              try {
-                                await ScoreService().awardVote(
-                                  ownerId: widget.ownerId,
-                                  taskId: widget.taskId,
-                                  likerId: viewerId,
-                                  likerLocalDateKey: localDateKey,
-                                );
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Vote recorded! Friend gained +1 point.',
-                                      ),
-                                    ),
+                      tooltip: hasVoted ? 'Undo vote' : 'Vote (+1 to friend)',
+                      onPressed: () async {
+                        if (_isProcessing) return;
+
+                        if (hasVoted) {
+                          setState(() => _isProcessing = true);
+                          try {
+                            await ScoreService().revokeVote(
+                              ownerId: widget.ownerId,
+                              taskId: widget.taskId,
+                              likerId: viewerId,
+                              likerLocalDateKey: localDateKey,
+                            );
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Vote removed')),
+                              );
+                            }
+
+                            // announce undo to ticker
+                            try {
+                              final owners = await ref
+                                  .read(userProfileCacheProvider)
+                                  .getByIds([widget.ownerId]);
+                              final ownerName = owners.isNotEmpty
+                                  ? owners.first.displayName
+                                  : widget.ownerId;
+                              ref
+                                  .read(voteTickerProvider.notifier)
+                                  .announce(
+                                    "${viewerProfile.displayName} removed vote for $ownerName's task",
+                                    color: Colors.pink,
                                   );
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  if (e.toString().contains(
-                                    'Daily vote limit reached',
-                                  )) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          "You've used all 10 votes for today!",
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error: $e')),
-                                    );
-                                  }
-                                }
+                            } catch (_) {}
+                          } catch (e, st) {
+                            // Try to unwrap boxed/converted errors for clearer messages.
+                            String message;
+                            try {
+                              final dyn = e as dynamic;
+                              if (dyn.error != null) {
+                                message = dyn.error.toString();
+                              } else if (dyn.message != null) {
+                                message = dyn.message.toString();
+                              } else {
+                                message = dyn.toString();
                               }
-                            },
+                            } catch (_) {
+                              message = e.toString();
+                            }
+                            debugPrint('revokeVote error: $e');
+                            debugPrint('$st');
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Error removing vote: $message',
+                                  ),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _isProcessing = false);
+                          }
+                        } else {
+                          setState(() => _isProcessing = true);
+                          try {
+                            await ScoreService().awardVote(
+                              ownerId: widget.ownerId,
+                              taskId: widget.taskId,
+                              likerId: viewerId,
+                              likerLocalDateKey: localDateKey,
+                            );
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Vote recorded! Friend gained +1 point.',
+                                  ),
+                                ),
+                              );
+                            }
+
+                            // Announce immediately for local votes so ticker shows
+                            try {
+                              final owners = await ref
+                                  .read(userProfileCacheProvider)
+                                  .getByIds([widget.ownerId]);
+                              final ownerName = owners.isNotEmpty
+                                  ? owners.first.displayName
+                                  : widget.ownerId;
+                              ref
+                                  .read(voteTickerProvider.notifier)
+                                  .announce(
+                                    "${viewerProfile.displayName} voted for $ownerName's task",
+                                    color: Colors.pink,
+                                  );
+                            } catch (_) {}
+                          } catch (e, st) {
+                            String message;
+                            try {
+                              final dyn = e as dynamic;
+                              if (dyn.error != null) {
+                                message = dyn.error.toString();
+                              } else if (dyn.message != null) {
+                                message = dyn.message.toString();
+                              } else {
+                                message = dyn.toString();
+                              }
+                            } catch (_) {
+                              message = e.toString();
+                            }
+                            debugPrint('awardVote error: $e');
+                            debugPrint('$st');
+                            if (context.mounted) {
+                              if (message.contains(
+                                'Daily vote limit reached',
+                              )) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      "You've used all 10 votes for today!",
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $message')),
+                                );
+                              }
+                            }
+                          } finally {
+                            if (mounted) setState(() => _isProcessing = false);
+                          }
+                        }
+                      },
                     ),
                   ],
                 ),

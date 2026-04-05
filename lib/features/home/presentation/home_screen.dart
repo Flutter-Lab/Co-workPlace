@@ -12,6 +12,7 @@ import 'package:coworkplace/features/profile/presentation/personal_profile_scree
 import 'package:coworkplace/features/profile/data/user_profile_repository.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
+import 'package:coworkplace/core/cache/user_profile_cache.dart';
 import 'package:coworkplace/features/tasks/data/completion_repository.dart';
 import 'package:coworkplace/features/tasks/data/task_repository.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
@@ -63,6 +64,7 @@ class HomeScreen extends ConsumerWidget {
               ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  const SizedBox(height: 48),
                   const _LeaderboardCard(),
                   const SizedBox(height: 8),
                   _FriendFeedSection(
@@ -107,6 +109,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              // VoteTicker moved to app root for global visibility.
             ],
           ),
         );
@@ -138,11 +141,18 @@ class _FriendFeedSection extends ConsumerStatefulWidget {
   ConsumerState<_FriendFeedSection> createState() => _FriendFeedSectionState();
 }
 
-class _LeaderboardCard extends ConsumerWidget {
-  const _LeaderboardCard({super.key});
+class _LeaderboardCard extends ConsumerStatefulWidget {
+  const _LeaderboardCard();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LeaderboardCard> createState() => _LeaderboardCardState();
+}
+
+class _LeaderboardCardState extends ConsumerState<_LeaderboardCard> {
+  final Map<String, Future<List<Map<String, dynamic>>>> _futureCache = {};
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(appSessionProvider).valueOrNull;
     final myId = session?.userId;
     if (myId == null) {
@@ -150,7 +160,7 @@ class _LeaderboardCard extends ConsumerWidget {
     }
 
     final friendRepo = ref.read(friendRepositoryProvider);
-    final profileRepo = ref.read(userProfileRepositoryProvider);
+    final profileCache = ref.read(userProfileCacheProvider);
     final service = ScoreService();
     final periodId = service.weekPeriodId(DateTime.now().toUtc());
 
@@ -171,11 +181,15 @@ class _LeaderboardCard extends ConsumerWidget {
         final friendIds = friends.map((f) => f.friendUserId as String).toSet();
         friendIds.add(myId);
 
+        final key = '${periodId}_${(friendIds.toList()..sort()).join(',')}';
+        _futureCache.putIfAbsent(
+          key,
+          () =>
+              service.getScoresForUsers(periodId: periodId, userIds: friendIds),
+        );
+
         return FutureBuilder<List<Map<String, dynamic>>>(
-          future: service.getScoresForUsers(
-            periodId: periodId,
-            userIds: friendIds,
-          ),
+          future: _futureCache[key],
           builder: (context, scoresSnap) {
             if (scoresSnap.hasError) {
               return const SizedBox.shrink();
@@ -191,7 +205,7 @@ class _LeaderboardCard extends ConsumerWidget {
             if (docs.isEmpty) {
               return Card(
                 child: ListTile(
-                  title: const Text('Weekly Top'),
+                  title: const Text('👑 Weekly Top'),
                   subtitle: const Text('No leaderboard data yet.'),
                   onTap: () {
                     Navigator.of(context).push(
@@ -209,12 +223,29 @@ class _LeaderboardCard extends ConsumerWidget {
             final points = top['points'] as int;
 
             return FutureBuilder<List<UserProfile>>(
-              future: profileRepo.getByIds([topId]),
+              future: (() async {
+                final cached = await profileCache.getByIds([topId]);
+                if (cached.isNotEmpty && cached.first.displayName != topId) {
+                  return cached;
+                }
+                final repo = ref.read(userProfileRepositoryProvider);
+                try {
+                  final fresh = await repo.getByIds([topId]);
+                  if (fresh.isNotEmpty) {
+                    // persist fresh profile into cache for future fast reads
+                    try {
+                      await profileCache.storeProfiles(fresh);
+                    } catch (_) {}
+                    return fresh;
+                  }
+                } catch (_) {}
+                return cached;
+              })(),
               builder: (context, profilesSnap) {
                 if (profilesSnap.connectionState == ConnectionState.waiting) {
                   return const Card(
                     child: ListTile(
-                      title: Text('Weekly Top'),
+                      title: Text('👑 Weekly Top'),
                       subtitle: Text('Loading...'),
                     ),
                   );
@@ -227,9 +258,15 @@ class _LeaderboardCard extends ConsumerWidget {
                 return Card(
                   child: ListTile(
                     leading: UserAvatar(profile: profile, radius: 20),
-                    title: const Text('Weekly Top'),
+                    title: const Text('👑 Weekly Top'),
                     subtitle: Text(display),
-                    trailing: Text('$points pts'),
+                    trailing: Text(
+                      '$points pts',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(

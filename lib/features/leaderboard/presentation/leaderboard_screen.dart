@@ -1,6 +1,6 @@
 import 'package:coworkplace/features/friends/providers/friend_providers.dart';
 import 'package:coworkplace/features/leaderboard/data/score_service.dart';
-import 'package:coworkplace/features/profile/providers/profile_providers.dart';
+import 'package:coworkplace/core/cache/user_profile_cache.dart';
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/core/widgets/user_avatar.dart';
@@ -113,10 +113,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                         final userIds = docs
                             .map((d) => d['userId'] as String)
                             .toList();
-                        final repo = ref.read(userProfileRepositoryProvider);
+                        final cache = ref.read(userProfileCacheProvider);
 
                         return FutureBuilder<List<UserProfile>>(
-                          future: repo.getByIds(userIds),
+                          future: cache.getByIds(userIds),
                           builder: (context, profilesSnap) {
                             if (profilesSnap.hasError) {
                               return Center(

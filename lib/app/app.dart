@@ -7,6 +7,7 @@ import 'package:coworkplace/core/bootstrap/bootstrap_state.dart';
 import 'package:coworkplace/features/auth/presentation/auth_entry_screen.dart';
 import 'package:coworkplace/features/home/presentation/home_shell_screen.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
+import 'package:coworkplace/core/widgets/vote_ticker.dart';
 import 'package:coworkplace/features/profile/presentation/profile_setup_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,7 +68,21 @@ class _SessionGate extends ConsumerWidget {
           return const SizedBox.shrink();
         }
 
-        return _BootstrapWarningOverlay(state: bootstrapState, child: child);
+        // Place the global VoteTicker above all screens so vote announcements
+        // appear regardless of current route.
+        final stacked = Stack(
+          children: [
+            child,
+            Positioned(
+              top: 8,
+              left: 12,
+              right: 12,
+              child: SafeArea(child: VoteTicker()),
+            ),
+          ],
+        );
+
+        return _BootstrapWarningOverlay(state: bootstrapState, child: stacked);
       },
     );
   }
@@ -197,11 +212,9 @@ class _PresenceHeartbeatState extends ConsumerState<_PresenceHeartbeat>
 
     _lastHeartbeatUtc = now;
     try {
-      await ref.read(userProfileRepositoryProvider).setPresence(
-            userId: widget.userId,
-            isOnline: true,
-            seenAtUtc: now,
-          );
+      await ref
+          .read(userProfileRepositoryProvider)
+          .setPresence(userId: widget.userId, isOnline: true, seenAtUtc: now);
     } catch (_) {
       // Presence should not crash the UI.
     }
@@ -209,7 +222,9 @@ class _PresenceHeartbeatState extends ConsumerState<_PresenceHeartbeat>
 
   Future<void> _setOffline() async {
     try {
-      await ref.read(userProfileRepositoryProvider).setPresence(
+      await ref
+          .read(userProfileRepositoryProvider)
+          .setPresence(
             userId: widget.userId,
             isOnline: false,
             seenAtUtc: DateTime.now().toUtc(),

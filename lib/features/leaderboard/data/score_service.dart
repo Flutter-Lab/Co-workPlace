@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class ScoreService {
   ScoreService({FirebaseFirestore? firestore})
@@ -43,33 +44,38 @@ class ScoreService {
     final monthId = monthPeriodId(now);
     final allId = alltimePeriodId();
 
-    await _firestore.runTransaction((tx) async {
-      final hourSnap = await tx.get(hourRef);
-      if (hourSnap.exists) {
-        return; // already awarded for this hour
-      }
-      tx.set(hourRef, {'createdAt': FieldValue.serverTimestamp()});
+    try {
+      await _firestore.runTransaction((tx) async {
+        final hourSnap = await tx.get(hourRef);
+        if (hourSnap.exists) {
+          return; // already awarded for this hour
+        }
+        tx.set(hourRef, {'createdAt': FieldValue.serverTimestamp()});
 
-      final weekRef = _firestore.doc('users/$userId/scores/$weekId');
-      final monthRef = _firestore.doc('users/$userId/scores/$monthId');
-      final allRef = _firestore.doc('users/$userId/scores/$allId');
+        final weekRef = _firestore.doc('users/$userId/scores/$weekId');
+        final monthRef = _firestore.doc('users/$userId/scores/$monthId');
+        final allRef = _firestore.doc('users/$userId/scores/$allId');
 
-      tx.set(weekRef, {
-        'periodId': weekId,
-        'points': FieldValue.increment(1),
-        'updatedAtUtc': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      tx.set(monthRef, {
-        'periodId': monthId,
-        'points': FieldValue.increment(1),
-        'updatedAtUtc': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      tx.set(allRef, {
-        'periodId': allId,
-        'points': FieldValue.increment(1),
-        'updatedAtUtc': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    });
+        tx.set(weekRef, {
+          'periodId': weekId,
+          'points': FieldValue.increment(1),
+          'updatedAtUtc': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        tx.set(monthRef, {
+          'periodId': monthId,
+          'points': FieldValue.increment(1),
+          'updatedAtUtc': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        tx.set(allRef, {
+          'periodId': allId,
+          'points': FieldValue.increment(1),
+          'updatedAtUtc': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      });
+    } catch (e, st) {
+      debugPrint('awardActivityHour failed: $e\n$st');
+      rethrow;
+    }
   }
 
   // Like a task (owner gets a point). Ensures unique like per likerId via deterministic doc id.
@@ -92,54 +98,72 @@ class ScoreService {
     final monthId = monthPeriodId(now);
     final allId = alltimePeriodId();
 
-    await _firestore.runTransaction((tx) async {
-      // 1. Check if already voted
-      final voteSnap = await tx.get(voteRef);
-      if (voteSnap.exists) {
-        return; // already voted
+    // try the transaction, retry once on transient failure
+    int attempts = 0;
+    while (true) {
+      try {
+        await _firestore.runTransaction((tx) async {
+          // 1. Check if already voted
+          final voteSnap = await tx.get(voteRef);
+          if (voteSnap.exists) {
+            return; // already voted
+          }
+
+          // 2. Check daily quota limit
+          final dailyVotesSnap = await tx.get(dailyVotesRef);
+          int votesUsed = 0;
+          if (dailyVotesSnap.exists) {
+            votesUsed = (dailyVotesSnap.data()?['count'] ?? 0) as int;
+          }
+
+          if (votesUsed >= 10) {
+            throw Exception('Daily vote limit reached');
+          }
+
+          // Record the vote
+          tx.set(voteRef, {'createdAt': FieldValue.serverTimestamp()});
+
+          // Increment daily quota constraint
+          tx.set(dailyVotesRef, {
+            'count': FieldValue.increment(1),
+            'updatedAtUtc': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+          // Award points to the task owner
+          final weekRef = _firestore.doc('users/$ownerId/scores/$weekId');
+          final monthRef = _firestore.doc('users/$ownerId/scores/$monthId');
+          final allRef = _firestore.doc('users/$ownerId/scores/$allId');
+
+          tx.set(weekRef, {
+            'periodId': weekId,
+            'points': FieldValue.increment(1),
+            'updatedAtUtc': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          tx.set(monthRef, {
+            'periodId': monthId,
+            'points': FieldValue.increment(1),
+            'updatedAtUtc': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          tx.set(allRef, {
+            'periodId': allId,
+            'points': FieldValue.increment(1),
+            'updatedAtUtc': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        });
+
+        // success
+        break;
+      } catch (e, st) {
+        attempts++;
+        debugPrint('awardVote transaction failed (attempt $attempts): $e\n$st');
+        if (attempts > 1) {
+          // give up and rethrow a descriptive error
+          throw Exception('awardVote failed: $e');
+        }
+        // small backoff
+        await Future.delayed(const Duration(milliseconds: 300));
       }
-
-      // 2. Check daily quota limit
-      final dailyVotesSnap = await tx.get(dailyVotesRef);
-      int votesUsed = 0;
-      if (dailyVotesSnap.exists) {
-        votesUsed = (dailyVotesSnap.data()?['count'] ?? 0) as int;
-      }
-
-      if (votesUsed >= 10) {
-        throw Exception('Daily vote limit reached');
-      }
-
-      // Record the vote
-      tx.set(voteRef, {'createdAt': FieldValue.serverTimestamp()});
-
-      // Increment daily quota constraint
-      tx.set(dailyVotesRef, {
-        'count': FieldValue.increment(1),
-        'updatedAtUtc': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      // Award points to the task owner
-      final weekRef = _firestore.doc('users/$ownerId/scores/$weekId');
-      final monthRef = _firestore.doc('users/$ownerId/scores/$monthId');
-      final allRef = _firestore.doc('users/$ownerId/scores/$allId');
-
-      tx.set(weekRef, {
-        'periodId': weekId,
-        'points': FieldValue.increment(1),
-        'updatedAtUtc': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      tx.set(monthRef, {
-        'periodId': monthId,
-        'points': FieldValue.increment(1),
-        'updatedAtUtc': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      tx.set(allRef, {
-        'periodId': allId,
-        'points': FieldValue.increment(1),
-        'updatedAtUtc': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    });
+    }
   }
 
   // Stream daily votes used for UI counters
@@ -156,6 +180,74 @@ class ScoreService {
         .collection('tasks/$ownerId/tasks/$taskId/votes')
         .snapshots()
         .map((snap) => snap.docs.map((d) => d.id).toList());
+  }
+
+  // Revoke a previously recorded vote: remove vote doc, decrement owner points and liker daily count
+  Future<void> revokeVote({
+    required String ownerId,
+    required String taskId,
+    required String likerId,
+    required String likerLocalDateKey,
+  }) async {
+    final voteRef = _firestore.doc(
+      'tasks/$ownerId/tasks/$taskId/votes/$likerId',
+    );
+    final dailyVotesRef = _firestore.doc(
+      'users/$likerId/daily_votes/$likerLocalDateKey',
+    );
+
+    final now = DateTime.now().toUtc();
+    final weekId = weekPeriodId(now);
+    final monthId = monthPeriodId(now);
+    final allId = alltimePeriodId();
+
+    await _firestore.runTransaction((tx) async {
+      final voteSnap = await tx.get(voteRef);
+      if (!voteSnap.exists) {
+        return; // nothing to revoke
+      }
+
+      // delete the vote doc
+      tx.delete(voteRef);
+
+      // decrement dailyVotes count safely
+      final dailySnap = await tx.get(dailyVotesRef);
+      final current =
+          (dailySnap.exists ? (dailySnap.data()?['count'] ?? 0) : 0) as int;
+      if (current > 0) {
+        tx.set(dailyVotesRef, {
+          'count': FieldValue.increment(-1),
+          'updatedAtUtc': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } else if (dailySnap.exists) {
+        // ensure non-negative
+        tx.set(dailyVotesRef, {
+          'count': 0,
+          'updatedAtUtc': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      // decrement owner's scores
+      final weekRef = _firestore.doc('users/$ownerId/scores/$weekId');
+      final monthRef = _firestore.doc('users/$ownerId/scores/$monthId');
+      final allRef = _firestore.doc('users/$ownerId/scores/$allId');
+
+      tx.set(weekRef, {
+        'periodId': weekId,
+        'points': FieldValue.increment(-1),
+        'updatedAtUtc': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      tx.set(monthRef, {
+        'periodId': monthId,
+        'points': FieldValue.increment(-1),
+        'updatedAtUtc': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      tx.set(allRef, {
+        'periodId': allId,
+        'points': FieldValue.increment(-1),
+        'updatedAtUtc': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    });
   }
 
   // Award for creating a task

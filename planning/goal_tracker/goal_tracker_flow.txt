@@ -1,0 +1,49 @@
+Goal Tracker (Easy Flow)
+========================
+
+|-- Goals
+|    |
+|    |-- No goals yet
+|    |    `-- Create Goal
+|    |
+|    `-- Goal list
+|         |
+|         |-- See current state
+|         |    |-- Completed
+|         |    |-- Remaining
+|         |    |-- Daily pace
+|         |    |-- Streak status
+|         |    `-- Expected finish
+|         |
+|         |-- For simple goals (example: 5000 steps run)
+|         |    `-- Add Progress only
+|         |
+|         `-- Goal Details
+|              |
+|              |-- Progress heatmap (fit screen)
+|              |-- Month labels + legend
+|              |-- If simple goal: Add Progress
+|              |-- If item-based goal: manage items
+|              `-- Edit or Delete goal
+|
+
+
+-----Don't Update anything bellow this line------
+
+
+Current Problems and Solutions:
+  1. When I try to add progress in Simple Goal and Edit item and Save item button click it shows Couldn't add progress in snackbar. May be firestore problem. Find and fix.
+  2. Fix Heatmap width properly. It should fit with screen. Improve UI.
+  3. Add heatmap legend and month labels for easier interpretation.
+  4. Add streak tracking (consecutive active days) in goal details.
+  5. Show current Goal states (UI) in better way and Improve UI (Don't use wraped item).
+  6. Goals screen has two Appbar and Title. It should show only One app bar. Find and fix this problem.
+  7. Test everything you updated in code and comfirm updates are working properly.
+  8. Suggest next improvements.
+  
+Prompt:
+  You are an expert Flutter developer. Now plan the implementation for updates in
+  "Current Problems and Solutions" with minimal code change and start implementation in one pass.
+  Test all updates properly after implementation and comfirm updates are working properly..
+  Update this file's ASCII tree plan with minimal changes if need. Keep easy readability.
+  Don't include your implementation plan in this file.

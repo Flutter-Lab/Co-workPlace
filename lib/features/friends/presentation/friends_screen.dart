@@ -6,6 +6,7 @@ import 'package:coworkplace/features/friends/domain/friend_request.dart';
 import 'package:coworkplace/features/friends/providers/friend_providers.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
+import 'package:coworkplace/core/cache/user_profile_cache.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
@@ -39,7 +40,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 
     return sessionAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stackTrace) => Center(child: Text('Session error: $error')),
+      error: (error, stackTrace) =>
+          Center(child: Text('Session error: $error')),
       data: (session) {
         final userId = session.userId;
         final profile = session.profile;
@@ -57,26 +59,41 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           stream: friendRepository.watchIncomingRequests(userId),
           builder: (context, incomingSnapshot) {
             if (incomingSnapshot.hasError) {
-              return Center(child: Text('Failed to load requests: ${incomingSnapshot.error}'));
+              return Center(
+                child: Text(
+                  'Failed to load requests: ${incomingSnapshot.error}',
+                ),
+              );
             }
 
             return StreamBuilder<List<FriendRequest>>(
               stream: friendRepository.watchOutgoingRequests(userId),
               builder: (context, outgoingSnapshot) {
                 if (outgoingSnapshot.hasError) {
-                  return Center(child: Text('Failed to load outgoing requests: ${outgoingSnapshot.error}'));
+                  return Center(
+                    child: Text(
+                      'Failed to load outgoing requests: ${outgoingSnapshot.error}',
+                    ),
+                  );
                 }
 
                 return StreamBuilder<List<FriendConnection>>(
                   stream: friendRepository.watchFriends(userId),
                   builder: (context, friendsSnapshot) {
                     if (friendsSnapshot.hasError) {
-                      return Center(child: Text('Failed to load friends: ${friendsSnapshot.error}'));
+                      return Center(
+                        child: Text(
+                          'Failed to load friends: ${friendsSnapshot.error}',
+                        ),
+                      );
                     }
 
-                    final incomingRequests = incomingSnapshot.data ?? const <FriendRequest>[];
-                    final outgoingRequests = outgoingSnapshot.data ?? const <FriendRequest>[];
-                    final friends = friendsSnapshot.data ?? const <FriendConnection>[];
+                    final incomingRequests =
+                        incomingSnapshot.data ?? const <FriendRequest>[];
+                    final outgoingRequests =
+                        outgoingSnapshot.data ?? const <FriendRequest>[];
+                    final friends =
+                        friendsSnapshot.data ?? const <FriendConnection>[];
 
                     return ListView(
                       padding: const EdgeInsets.all(16),
@@ -87,7 +104,12 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Find friends', style: Theme.of(context).textTheme.titleMedium),
+                                Text(
+                                  'Find friends',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
                                 const SizedBox(height: 8),
                                 Text(
                                   'Send a request using an exact username. Full search and richer discovery come next.',
@@ -103,15 +125,24 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                                     border: OutlineInputBorder(),
                                     prefixText: '@',
                                   ),
-                                  onSubmitted: (_) => _sendRequest(currentUserId: userId),
+                                  onSubmitted: (_) =>
+                                      _sendRequest(currentUserId: userId),
                                 ),
                                 const SizedBox(height: 12),
                                 SizedBox(
                                   width: double.infinity,
                                   child: FilledButton.icon(
-                                    onPressed: _isSendingRequest ? null : () => _sendRequest(currentUserId: userId),
+                                    onPressed: _isSendingRequest
+                                        ? null
+                                        : () => _sendRequest(
+                                            currentUserId: userId,
+                                          ),
                                     icon: const Icon(Icons.person_add_alt_1),
-                                    label: Text(_isSendingRequest ? 'Sending...' : 'Send Friend Request'),
+                                    label: Text(
+                                      _isSendingRequest
+                                          ? 'Sending...'
+                                          : 'Send Friend Request',
+                                    ),
                                   ),
                                 ),
                               ],
@@ -119,33 +150,52 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _SectionTitle(title: 'Incoming Requests', count: incomingRequests.length),
+                        _SectionTitle(
+                          title: 'Incoming Requests',
+                          count: incomingRequests.length,
+                        ),
                         const SizedBox(height: 8),
                         _ProfileLookupList(
-                          ids: incomingRequests.map((request) => request.otherUserId).toList(),
+                          ids: incomingRequests
+                              .map((request) => request.otherUserId)
+                              .toList(),
                           emptyTitle: 'No incoming requests',
-                          emptySubtitle: 'When someone adds you, the request will appear here.',
+                          emptySubtitle:
+                              'When someone adds you, the request will appear here.',
                           itemBuilder: (otherProfile) {
                             final request = incomingRequests.firstWhere(
                               (item) => item.otherUserId == otherProfile.id,
                             );
                             return Card(
                               child: ListTile(
-                                leading: UserAvatar(profile: otherProfile, radius: 20),
+                                leading: UserAvatar(
+                                  profile: otherProfile,
+                                  radius: 20,
+                                ),
                                 title: Text(otherProfile.displayName),
-                                subtitle: Text('@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}'),
+                                subtitle: Text(
+                                  '@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}',
+                                ),
                                 isThreeLine: false,
                                 trailing: Wrap(
                                   spacing: 8,
                                   children: [
                                     IconButton(
                                       tooltip: 'Accept',
-                                      onPressed: () => _acceptRequest(userId: userId, fromUserId: otherProfile.id),
-                                      icon: const Icon(Icons.check_circle_outline),
+                                      onPressed: () => _acceptRequest(
+                                        userId: userId,
+                                        fromUserId: otherProfile.id,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.check_circle_outline,
+                                      ),
                                     ),
                                     IconButton(
                                       tooltip: 'Reject',
-                                      onPressed: () => _rejectRequest(userId: userId, fromUserId: otherProfile.id),
+                                      onPressed: () => _rejectRequest(
+                                        userId: userId,
+                                        fromUserId: otherProfile.id,
+                                      ),
                                       icon: const Icon(Icons.cancel_outlined),
                                     ),
                                   ],
@@ -155,23 +205,37 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        _SectionTitle(title: 'Outgoing Requests', count: outgoingRequests.length),
+                        _SectionTitle(
+                          title: 'Outgoing Requests',
+                          count: outgoingRequests.length,
+                        ),
                         const SizedBox(height: 8),
                         _ProfileLookupList(
-                          ids: outgoingRequests.map((request) => request.otherUserId).toList(),
+                          ids: outgoingRequests
+                              .map((request) => request.otherUserId)
+                              .toList(),
                           emptyTitle: 'No pending requests',
-                          emptySubtitle: 'Requests you send will stay here until accepted or canceled.',
+                          emptySubtitle:
+                              'Requests you send will stay here until accepted or canceled.',
                           itemBuilder: (otherProfile) {
                             final request = outgoingRequests.firstWhere(
                               (item) => item.otherUserId == otherProfile.id,
                             );
                             return Card(
                               child: ListTile(
-                                leading: UserAvatar(profile: otherProfile, radius: 20),
+                                leading: UserAvatar(
+                                  profile: otherProfile,
+                                  radius: 20,
+                                ),
                                 title: Text(otherProfile.displayName),
-                                subtitle: Text('@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}'),
+                                subtitle: Text(
+                                  '@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}',
+                                ),
                                 trailing: TextButton(
-                                  onPressed: () => _cancelRequest(userId: userId, toUserId: otherProfile.id),
+                                  onPressed: () => _cancelRequest(
+                                    userId: userId,
+                                    toUserId: otherProfile.id,
+                                  ),
                                   child: const Text('Cancel'),
                                 ),
                               ),
@@ -182,16 +246,22 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                         _SectionTitle(title: 'Friends', count: friends.length),
                         const SizedBox(height: 8),
                         _ProfileLookupList(
-                          ids: friends.map((friend) => friend.friendUserId).toList(),
+                          ids: friends
+                              .map((friend) => friend.friendUserId)
+                              .toList(),
                           emptyTitle: 'No friends yet',
-                          emptySubtitle: 'Add people by username to start building your social layer.',
+                          emptySubtitle:
+                              'Add people by username to start building your social layer.',
                           itemBuilder: (otherProfile) {
                             final friend = friends.firstWhere(
                               (item) => item.friendUserId == otherProfile.id,
                             );
                             return Card(
                               child: ListTile(
-                                leading: UserAvatar(profile: otherProfile, radius: 20),
+                                leading: UserAvatar(
+                                  profile: otherProfile,
+                                  radius: 20,
+                                ),
                                 title: Text(otherProfile.displayName),
                                 subtitle: Text(
                                   '@${otherProfile.username} • ${otherProfile.currentMode?.label ?? 'No mode set'}',
@@ -199,15 +269,27 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                                 trailing: PopupMenuButton<String>(
                                   onSelected: (value) {
                                     if (value == 'view') {
-                                      _showFriendQuickProfile(otherProfile, friend);
+                                      _showFriendQuickProfile(
+                                        otherProfile,
+                                        friend,
+                                      );
                                     }
                                     if (value == 'remove') {
-                                      _removeFriend(userId: userId, friendUserId: otherProfile.id);
+                                      _removeFriend(
+                                        userId: userId,
+                                        friendUserId: otherProfile.id,
+                                      );
                                     }
                                   },
                                   itemBuilder: (context) => const [
-                                    PopupMenuItem(value: 'view', child: Text('View profile')),
-                                    PopupMenuItem(value: 'remove', child: Text('Remove friend')),
+                                    PopupMenuItem(
+                                      value: 'view',
+                                      child: Text('View profile'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'remove',
+                                      child: Text('Remove friend'),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -264,55 +346,66 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     }
   }
 
-  Future<void> _acceptRequest({required String userId, required String fromUserId}) async {
+  Future<void> _acceptRequest({
+    required String userId,
+    required String fromUserId,
+  }) async {
     try {
-      await ref.read(friendRepositoryProvider).acceptFriendRequest(
-        userId: userId,
-        fromUserId: fromUserId,
-      );
+      await ref
+          .read(friendRepositoryProvider)
+          .acceptFriendRequest(userId: userId, fromUserId: fromUserId);
       _showSnack('Friend request accepted.');
     } catch (error) {
       _showSnack('Failed to accept request: $error');
     }
   }
 
-  Future<void> _rejectRequest({required String userId, required String fromUserId}) async {
+  Future<void> _rejectRequest({
+    required String userId,
+    required String fromUserId,
+  }) async {
     try {
-      await ref.read(friendRepositoryProvider).rejectFriendRequest(
-        userId: userId,
-        fromUserId: fromUserId,
-      );
+      await ref
+          .read(friendRepositoryProvider)
+          .rejectFriendRequest(userId: userId, fromUserId: fromUserId);
       _showSnack('Friend request rejected.');
     } catch (error) {
       _showSnack('Failed to reject request: $error');
     }
   }
 
-  Future<void> _cancelRequest({required String userId, required String toUserId}) async {
+  Future<void> _cancelRequest({
+    required String userId,
+    required String toUserId,
+  }) async {
     try {
-      await ref.read(friendRepositoryProvider).cancelOutgoingRequest(
-        userId: userId,
-        toUserId: toUserId,
-      );
+      await ref
+          .read(friendRepositoryProvider)
+          .cancelOutgoingRequest(userId: userId, toUserId: toUserId);
       _showSnack('Friend request canceled.');
     } catch (error) {
       _showSnack('Failed to cancel request: $error');
     }
   }
 
-  Future<void> _removeFriend({required String userId, required String friendUserId}) async {
+  Future<void> _removeFriend({
+    required String userId,
+    required String friendUserId,
+  }) async {
     try {
-      await ref.read(friendRepositoryProvider).removeFriend(
-        userId: userId,
-        friendUserId: friendUserId,
-      );
+      await ref
+          .read(friendRepositoryProvider)
+          .removeFriend(userId: userId, friendUserId: friendUserId);
       _showSnack('Friend removed.');
     } catch (error) {
       _showSnack('Failed to remove friend: $error');
     }
   }
 
-  Future<void> _showFriendQuickProfile(UserProfile profile, FriendConnection connection) async {
+  Future<void> _showFriendQuickProfile(
+    UserProfile profile,
+    FriendConnection connection,
+  ) async {
     final taskRepository = ref.read(taskRepositoryProvider);
     final completionRepository = ref.read(completionRepositoryProvider);
     final localDateKey = _safeLocalDateKey(profile);
@@ -335,7 +428,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   localDateKey: localDateKey,
                 ),
                 builder: (context, completionSnapshot) {
-                  final completions = completionSnapshot.data ?? const <TaskCompletion>[];
+                  final completions =
+                      completionSnapshot.data ?? const <TaskCompletion>[];
                   final doneCount = completions
                       .where((item) => item.status == CompletionStatus.done)
                       .length;
@@ -348,11 +442,17 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                     children: [
                       Text('@${profile.username}'),
                       const SizedBox(height: 6),
-                      Text('Mode: ${profile.currentMode?.label ?? 'No mode set'}'),
+                      Text(
+                        'Mode: ${profile.currentMode?.label ?? 'No mode set'}',
+                      ),
                       const SizedBox(height: 6),
-                      Text('Timezone: ${profile.timezone} • Owner day: $localDateKey'),
+                      Text(
+                        'Timezone: ${profile.timezone} • Owner day: $localDateKey',
+                      ),
                       const SizedBox(height: 6),
-                      Text('Friends since: ${_formatDate(connection.createdAtUtc)}'),
+                      Text(
+                        'Friends since: ${_formatDate(connection.createdAtUtc)}',
+                      ),
                       const SizedBox(height: 6),
                       Text(summary),
                     ],
@@ -407,7 +507,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -436,9 +538,9 @@ class _ProfileLookupList extends ConsumerWidget {
       );
     }
 
-    final profileRepository = ref.watch(userProfileRepositoryProvider);
+    final cache = ref.watch(userProfileCacheProvider);
     return FutureBuilder<List<UserProfile>>(
-      future: profileRepository.getByIds(ids),
+      future: cache.getByIds(ids),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Card(
@@ -464,9 +566,7 @@ class _ProfileLookupList extends ConsumerWidget {
         }
 
         final profiles = snapshot.data!;
-        return Column(
-          children: profiles.map(itemBuilder).toList(),
-        );
+        return Column(children: profiles.map(itemBuilder).toList());
       },
     );
   }
@@ -503,7 +603,9 @@ class _FriendsNoDataRuntimeScreen extends StatelessWidget {
           child: ListTile(
             leading: Icon(Icons.people_outline),
             title: Text('Friends'),
-            subtitle: Text('Friend data becomes available after Firebase is initialized.'),
+            subtitle: Text(
+              'Friend data becomes available after Firebase is initialized.',
+            ),
           ),
         ),
       ],
