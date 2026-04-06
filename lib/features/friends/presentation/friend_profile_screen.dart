@@ -200,7 +200,7 @@ class _FriendGoalsSection extends ConsumerWidget {
 
     return goalsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (err, st) => const SizedBox.shrink(),
       data: (goals) {
         if (goals.isEmpty) return const SizedBox.shrink();
 

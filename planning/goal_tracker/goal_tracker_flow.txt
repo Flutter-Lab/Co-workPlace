@@ -61,11 +61,13 @@ Add little more detail in Tree and Modify Tree style like this:
 
 
 Current Problems and Solutions:
-  1. Implement 'Friend goal read-only view' properly
-  2. Make Goal Progress bar in random color. But keep the color vibe properly.
-  3. Implement Confetti or completion animation — Celebrate when a goal hits 100%.
-  4. Test everything you updated in code and comfirm updates are working properly.
-  5. Suggest next improvements.
+  1. Implement Deadline-aware goal creation warning — if target and deadline would require more units/day than a realistic pace, show a caution.
+  2. Implement Progress entry log — a scrollable history card in Goal Details showing each day's entries.
+  3. Implement Goal re-ordering — drag to reorder goals in the list.
+  4. Implement Share goal progress — let users share a snapshot of a goal card image to social/friends.
+  5. Implement Widgets / notifications — a local notification reminder if a user hasn't added progress to a goal in last 24 hours.
+  6. Test everything you updated in code and comfirm updates are working properly.
+  7. Suggest next improvements.
   
 Prompt:
   You are an expert Flutter developer. Now plan the implementation for updates in

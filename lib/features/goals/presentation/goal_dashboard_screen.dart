@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:coworkplace/features/goals/domain/goal.dart';
 import 'package:coworkplace/features/goals/domain/goal_item.dart';
 import 'package:coworkplace/features/goals/domain/goal_metrics.dart';
@@ -9,11 +10,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-class GoalDashboardScreen extends ConsumerWidget {
+class GoalDashboardScreen extends ConsumerStatefulWidget {
   const GoalDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GoalDashboardScreen> createState() =>
+      _GoalDashboardScreenState();
+}
+
+class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
+  List<String>? _orderedIds;
+
+  @override
+  Widget build(BuildContext context) {
     final sessionAsync = ref.watch(appSessionProvider);
 
     return sessionAsync.when(
@@ -37,8 +46,7 @@ class GoalDashboardScreen extends ConsumerWidget {
         return Scaffold(
           appBar: AppBar(title: const Text('Goal Tracker')),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () =>
-                _onCreateGoal(context: context, ref: ref, userId: userId),
+            onPressed: () => _onCreateGoal(context: context, userId: userId),
             icon: const Icon(Icons.add),
             label: const Text('New Goal'),
           ),
@@ -56,60 +64,117 @@ class GoalDashboardScreen extends ConsumerWidget {
                 data: (goals) {
                   if (goals.isEmpty) {
                     return _GoalEmptyState(
-                      onCreate: () => _onCreateGoal(
-                        context: context,
-                        ref: ref,
-                        userId: userId,
-                      ),
+                      onCreate: () =>
+                          _onCreateGoal(context: context, userId: userId),
                     );
                   }
 
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                    children: [
-                      _GoalOverviewCard(goals: goals),
-                      const SizedBox(height: 16),
-                      for (final goal in goals) ...[
-                        _GoalCard(
-                          goal: goal,
-                          metrics: GoalMetrics.compute(
-                            targetValue: goal.targetValue,
-                            completedValue: goal.completedValue,
-                            createdAtUtc: goal.startDateUtc,
-                            deadlineUtc: goal.deadlineUtc,
+                  // Build ordered goals list.
+                  final goalMap = {for (final g in goals) g.id: g};
+                  final List<Goal> orderedGoals;
+                  if (_orderedIds == null) {
+                    orderedGoals = goals;
+                  } else {
+                    final result = _orderedIds!
+                        .where(goalMap.containsKey)
+                        .map((id) => goalMap[id]!)
+                        .toList();
+                    for (final g in goals) {
+                      if (!_orderedIds!.contains(g.id)) result.add(g);
+                    }
+                    orderedGoals = result;
+                  }
+
+                  return CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            children: [
+                              _GoalOverviewCard(goals: goals),
+                              const SizedBox(height: 16),
+                            ],
                           ),
-                          onViewDetails: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => GoalDetailScreen(
-                                  userId: userId,
-                                  goalId: goal.id,
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverReorderableList(
+                          itemCount: orderedGoals.length,
+                          itemBuilder: (context, index) {
+                            final goal = orderedGoals[index];
+                            final metrics = GoalMetrics.compute(
+                              targetValue: goal.targetValue,
+                              completedValue: goal.completedValue,
+                              createdAtUtc: goal.startDateUtc,
+                              deadlineUtc: goal.deadlineUtc,
+                            );
+                            final isStale =
+                                metrics.remaining > 0 &&
+                                DateTime.now()
+                                        .toUtc()
+                                        .difference(goal.updatedAtUtc)
+                                        .inHours >=
+                                    24;
+                            return ReorderableDelayedDragStartListener(
+                              key: ValueKey(goal.id),
+                              index: index,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _GoalCard(
+                                  goal: goal,
+                                  metrics: metrics,
+                                  isStale: isStale,
+                                  onViewDetails: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => GoalDetailScreen(
+                                          userId: userId,
+                                          goalId: goal.id,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  onAddItem: () => _onCreateItem(
+                                    context: context,
+                                    userId: userId,
+                                    goalId: goal.id,
+                                  ),
+                                  onAddProgress: () => _onAddSimpleProgress(
+                                    context: context,
+                                    userId: userId,
+                                    goalId: goal.id,
+                                  ),
+                                  onEdit: () => _onEditGoal(
+                                    context: context,
+                                    userId: userId,
+                                    goal: goal,
+                                  ),
+                                  onShare: () =>
+                                      _shareGoal(goal, metrics, context),
                                 ),
                               ),
                             );
                           },
-                          onAddItem: () => _onCreateItem(
-                            context: context,
-                            ref: ref,
-                            userId: userId,
-                            goalId: goal.id,
-                          ),
-                          onAddProgress: () => _onAddSimpleProgress(
-                            context: context,
-                            ref: ref,
-                            userId: userId,
-                            goalId: goal.id,
-                          ),
-                          onEdit: () => _onEditGoal(
-                            context: context,
-                            ref: ref,
-                            userId: userId,
-                            goal: goal,
-                          ),
+                          onReorder: (oldIndex, newIndex) {
+                            setState(() {
+                              if (newIndex > oldIndex) newIndex--;
+                              final ids = orderedGoals
+                                  .map((g) => g.id)
+                                  .toList();
+                              ids.insert(newIndex, ids.removeAt(oldIndex));
+                              _orderedIds = ids;
+                            });
+                          },
                         ),
-                        const SizedBox(height: 12),
-                      ],
-                      _ArchivedGoalsSection(userId: userId),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                        sliver: SliverToBoxAdapter(
+                          child: _ArchivedGoalsSection(userId: userId),
+                        ),
+                      ),
                     ],
                   );
                 },
@@ -123,7 +188,6 @@ class GoalDashboardScreen extends ConsumerWidget {
 
   Future<void> _onCreateGoal({
     required BuildContext context,
-    required WidgetRef ref,
     required String userId,
   }) async {
     final draft = await _showGoalFormSheet(context: context);
@@ -156,7 +220,6 @@ class GoalDashboardScreen extends ConsumerWidget {
 
   Future<void> _onEditGoal({
     required BuildContext context,
-    required WidgetRef ref,
     required String userId,
     required Goal goal,
   }) async {
@@ -193,7 +256,6 @@ class GoalDashboardScreen extends ConsumerWidget {
 
   Future<void> _onCreateItem({
     required BuildContext context,
-    required WidgetRef ref,
     required String userId,
     required String goalId,
   }) async {
@@ -225,7 +287,6 @@ class GoalDashboardScreen extends ConsumerWidget {
 
   Future<void> _onAddSimpleProgress({
     required BuildContext context,
-    required WidgetRef ref,
     required String userId,
     required String goalId,
   }) async {
@@ -246,6 +307,16 @@ class GoalDashboardScreen extends ConsumerWidget {
         context,
       ).showSnackBar(SnackBar(content: Text('Could not add progress: $e')));
     }
+  }
+
+  void _shareGoal(Goal goal, GoalMetrics metrics, BuildContext context) {
+    final unit = _goalUnitLabel(goal);
+    final text =
+        '${goal.title}\n'
+        '${metrics.progressPercent.toStringAsFixed(1)}% complete \u2014 '
+        '${_formatNumber(metrics.completed)} / ${_formatNumber(metrics.target)} $unit'
+        '\n\nTracked with Coworkplace';
+    SharePlus.instance.share(ShareParams(text: text));
   }
 }
 
@@ -349,6 +420,11 @@ class GoalDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     _GoalHeatmapCard(dailyProgress: dailyProgress),
+                    const SizedBox(height: 12),
+                    _GoalProgressLogCard(
+                      dailyProgress: dailyProgress,
+                      unitLabel: _goalUnitLabel(goal),
+                    ),
                   ],
                 );
               }
@@ -372,6 +448,11 @@ class GoalDetailScreen extends ConsumerWidget {
                       _GoalSummaryCard(goal: goal, metrics: metrics),
                       const SizedBox(height: 12),
                       _GoalHeatmapCard(dailyProgress: dailyProgress),
+                      const SizedBox(height: 12),
+                      _GoalProgressLogCard(
+                        dailyProgress: dailyProgress,
+                        unitLabel: _goalUnitLabel(goal),
+                      ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -709,6 +790,8 @@ class _GoalCard extends StatelessWidget {
     required this.onAddItem,
     required this.onAddProgress,
     required this.onEdit,
+    required this.onShare,
+    this.isStale = false,
   });
 
   final Goal goal;
@@ -717,6 +800,8 @@ class _GoalCard extends StatelessWidget {
   final VoidCallback onAddItem;
   final VoidCallback onAddProgress;
   final VoidCallback onEdit;
+  final VoidCallback onShare;
+  final bool isStale;
 
   @override
   Widget build(BuildContext context) {
@@ -745,6 +830,32 @@ class _GoalCard extends StatelessWidget {
                     onPressed: onEdit,
                     icon: const Icon(Icons.edit_outlined),
                     tooltip: 'Edit goal',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: onShare,
+                    icon: const Icon(Icons.share_outlined),
+                    tooltip: 'Share goal',
+                    iconSize: 18,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 2, right: 2),
+                    child: Icon(
+                      Icons.drag_handle,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
                   ),
                 ],
               ),
@@ -764,6 +875,27 @@ class _GoalCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
+              if (isStale) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.notifications_outlined,
+                      size: 14,
+                      color: Color(0xFFF59E0B),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'No progress logged in 24+ hours',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -1767,10 +1899,14 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
     _isSimpleGoal = existing?.isSimpleGoal ?? false;
     _startDateUtc = existing?.startDateUtc ?? DateTime.now().toUtc();
     _deadlineUtc = existing?.deadlineUtc;
+    _targetController.addListener(_onTargetChanged);
   }
+
+  void _onTargetChanged() => setState(() {});
 
   @override
   void dispose() {
+    _targetController.removeListener(_onTargetChanged);
     _titleController.dispose();
     _targetController.dispose();
     _customUnitController.dispose();
@@ -1928,7 +2064,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              _buildPacePreview(),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -1943,6 +2079,78 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
         ),
       ),
     );
+  }
+
+  Widget _buildPacePreview() {
+    final target = double.tryParse(_targetController.text.trim());
+    if (target == null || target <= 0 || _deadlineUtc == null) {
+      return const SizedBox.shrink();
+    }
+    final now = DateTime.now().toUtc();
+    final daysRemaining = _deadlineUtc!.difference(now).inDays + 1;
+    if (daysRemaining <= 0) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              size: 16,
+              color: Color(0xFFEF4444),
+            ),
+            SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Deadline is in the past.',
+                style: TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final pace = target / daysRemaining;
+    final unitLabel = _unitType == GoalUnitType.custom
+        ? (_customUnitController.text.trim().isEmpty
+              ? 'units'
+              : _customUnitController.text.trim())
+        : _unitType.displayLabel.toLowerCase();
+    final isAggressive = _isPaceAggressive(pace, _unitType);
+    final color = isAggressive
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFF22C55E);
+    final icon = isAggressive
+        ? Icons.warning_amber_rounded
+        : Icons.check_circle_outline;
+    final msg = isAggressive
+        ? 'Needs ${_formatNumber(pace)} $unitLabel/day — consider extending the deadline.'
+        : 'Required pace: ${_formatNumber(pace)} $unitLabel/day';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(msg, style: TextStyle(color: color, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static bool _isPaceAggressive(double pace, GoalUnitType unit) {
+    return switch (unit) {
+      GoalUnitType.hours => pace > 6,
+      GoalUnitType.min => pace > 360,
+      GoalUnitType.kilometers => pace > 20,
+      GoalUnitType.miles => pace > 12,
+      GoalUnitType.steps => pace > 20000,
+      GoalUnitType.calories => pace > 1500,
+      GoalUnitType.workouts => pace > 2,
+      GoalUnitType.books => pace > 1,
+      _ => false,
+    };
   }
 
   Future<void> _pickStartDate() async {
@@ -2469,6 +2677,74 @@ class _SparklesPainter extends CustomPainter {
   bool shouldRepaint(_SparklesPainter old) => old.progress != progress;
 }
 
+// ── Goal Progress Log Card ───────────────────────────────────────────────────
+
+class _GoalProgressLogCard extends StatelessWidget {
+  const _GoalProgressLogCard({
+    required this.dailyProgress,
+    required this.unitLabel,
+  });
+
+  final Map<DateTime, double> dailyProgress;
+  final String unitLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    if (dailyProgress.isEmpty) return const SizedBox.shrink();
+
+    final sortedEntries = dailyProgress.entries.toList()
+      ..sort((a, b) => b.key.compareTo(a.key));
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Progress Log',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            for (final entry in sortedEntries.take(30)) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      DateFormat('dd MMM yyyy').format(entry.key.toLocal()),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const Spacer(),
+                    Text(
+                      '+${_formatNumber(entry.value)} $unitLabel',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (entry != sortedEntries.take(30).last)
+                const Divider(height: 1),
+            ],
+            if (dailyProgress.length > 30)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Showing most recent 30 entries.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Goal Overview Card ────────────────────────────────────────────────────────
 
 class _GoalOverviewCard extends StatelessWidget {
@@ -2609,7 +2885,7 @@ class _ArchivedGoalsSection extends ConsumerWidget {
 
     return archivedAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (err, st) => const SizedBox.shrink(),
       data: (archived) {
         if (archived.isEmpty) return const SizedBox.shrink();
 
