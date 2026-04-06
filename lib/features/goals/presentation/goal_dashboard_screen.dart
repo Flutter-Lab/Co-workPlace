@@ -325,6 +325,7 @@ class GoalDetailScreen extends ConsumerWidget {
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                   children: [
+                    _DeadlineWarningBanner(goal: goal, metrics: metrics),
                     _GoalSummaryCard(goal: goal, metrics: metrics),
                     const SizedBox(height: 12),
                     _SimpleGoalProgressCard(
@@ -349,6 +350,7 @@ class GoalDetailScreen extends ConsumerWidget {
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     children: [
+                      _DeadlineWarningBanner(goal: goal, metrics: metrics),
                       _GoalSummaryCard(goal: goal, metrics: metrics),
                       const SizedBox(height: 12),
                       _GoalHeatmapCard(dailyProgress: dailyProgress),
@@ -738,11 +740,7 @@ class _GoalCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 10),
-              LinearProgressIndicator(
-                value: metrics.progressPercent / 100,
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(4),
-              ),
+              _GoalProgressBar(percent: metrics.progressPercent),
               const SizedBox(height: 10),
               _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
               const SizedBox(height: 12),
@@ -823,11 +821,7 @@ class _GoalSummaryCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: metrics.progressPercent / 100,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
+            _GoalProgressBar(percent: metrics.progressPercent),
             const SizedBox(height: 10),
             _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
           ],
@@ -1492,13 +1486,7 @@ class _GoalItemCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: item.progressPercent / 100,
-              minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            const SizedBox(height: 6),
-            Text('Progress: ${item.progressPercent.toStringAsFixed(1)}%'),
+            _GoalProgressBar(percent: item.progressPercent),
             if (item.note?.isNotEmpty == true) ...[
               const SizedBox(height: 6),
               Text(item.note!, style: Theme.of(context).textTheme.bodySmall),
@@ -1748,7 +1736,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
     _customUnitController = TextEditingController(
       text: existing?.customUnitLabel ?? '',
     );
-    _unitType = existing?.unitType ?? GoalUnitType.minutes;
+    _unitType = existing?.unitType ?? GoalUnitType.min;
     _isSimpleGoal = existing?.isSimpleGoal ?? false;
     _startDateUtc = existing?.startDateUtc ?? DateTime.now().toUtc();
     _deadlineUtc = existing?.deadlineUtc;
@@ -2153,6 +2141,144 @@ String _formatNumber(double value) {
     return value.toStringAsFixed(0);
   }
   return value.toStringAsFixed(1);
+}
+
+// ── Deadline Warning Banner ───────────────────────────────────────────────────
+
+class _DeadlineWarningBanner extends StatelessWidget {
+  const _DeadlineWarningBanner({required this.goal, required this.metrics});
+
+  final Goal goal;
+  final GoalMetrics metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    // Only show when there is a deadline and the goal is not completed.
+    if (goal.deadlineUtc == null || metrics.remaining <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    final days = metrics.remainingDays ?? 0;
+    final isPaceBehind =
+        metrics.requiredPerDay != null &&
+        metrics.averagePerDay < metrics.requiredPerDay!;
+    final isCloseToDue = days <= 7;
+
+    if (!isPaceBehind && !isCloseToDue) {
+      return const SizedBox.shrink();
+    }
+
+    final String message;
+    final Color bgColor;
+    final Color borderColor;
+    final Color textColor;
+    final IconData icon;
+
+    if (days == 0) {
+      message = 'Deadline is today! Push hard to finish.';
+      bgColor = const Color(0xFFFEE2E2);
+      borderColor = const Color(0xFFEF4444);
+      textColor = const Color(0xFF991B1B);
+      icon = Icons.warning_amber_rounded;
+    } else if (days <= 3 || (isPaceBehind && days <= 7)) {
+      message = days <= 3
+          ? '$days day${days == 1 ? '' : 's'} left — you\'re running out of time!'
+          : '$days days left and current pace is below target.';
+      bgColor = const Color(0xFFFEE2E2);
+      borderColor = const Color(0xFFEF4444);
+      textColor = const Color(0xFF991B1B);
+      icon = Icons.warning_amber_rounded;
+    } else {
+      message = '$days days to deadline — pace needs to pick up.';
+      bgColor = const Color(0xFFFEF3C7);
+      borderColor = const Color(0xFFF59E0B);
+      textColor = const Color(0xFF92400E);
+      icon = Icons.access_time_outlined;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, color: textColor, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Goal Progress Bar ─────────────────────────────────────────────────────────
+
+class _GoalProgressBar extends StatelessWidget {
+  const _GoalProgressBar({required this.percent});
+
+  final double percent; // 0.0 – 100.0
+
+  @override
+  Widget build(BuildContext context) {
+    final clamped = percent.clamp(0.0, 100.0);
+    final fillFraction = clamped / 100;
+
+    final Color fillColor;
+    if (clamped >= 75) {
+      fillColor = const Color(0xFF22C55E); // green
+    } else if (clamped >= 35) {
+      fillColor = const Color(0xFF3B82F6); // blue
+    } else {
+      fillColor = const Color(0xFFF59E0B); // amber
+    }
+
+    // Label is white when fill covers > 50% of the bar, otherwise use fill color.
+    final labelColor = fillFraction >= 0.5 ? Colors.white : fillColor;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        height: 26,
+        child: Stack(
+          children: [
+            Container(color: fillColor.withAlpha(30)),
+            FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: fillFraction,
+              child: Container(decoration: BoxDecoration(color: fillColor)),
+            ),
+            Center(
+              child: Text(
+                '${clamped.toStringAsFixed(1)}%',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: labelColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ── Goal Overview Card ────────────────────────────────────────────────────────

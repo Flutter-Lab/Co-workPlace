@@ -32,3 +32,14 @@ final archivedUserGoalsProvider = StreamProvider<List<Goal>>((ref) {
       .watchGoals(userId)
       .map((goals) => goals.where((g) => g.isArchived).toList());
 });
+
+/// Stream of a friend's non-archived goals, keyed by their user ID.
+final friendGoalsProvider = StreamProvider.family<List<Goal>, String>((
+  ref,
+  friendUserId,
+) {
+  return ref
+      .watch(goalRepositoryProvider)
+      .watchGoals(friendUserId)
+      .map((goals) => goals.where((g) => !g.isArchived).toList());
+});

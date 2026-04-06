@@ -1,5 +1,4 @@
 enum GoalUnitType {
-  minutes,
   min,
   pages,
   books,
@@ -104,9 +103,11 @@ class Goal {
 
   factory Goal.fromMap(Map<String, dynamic> map) {
     final rawUnitType = map['unitType'] as String?;
+    // Legacy: 'minutes' was renamed to 'min'.
+    final normalizedUnitType = rawUnitType == 'minutes' ? 'min' : rawUnitType;
     GoalUnitType parsedUnitType = GoalUnitType.count;
     for (final value in GoalUnitType.values) {
-      if (value.name == rawUnitType) {
+      if (value.name == normalizedUnitType) {
         parsedUnitType = value;
         break;
       }
@@ -138,8 +139,6 @@ class Goal {
 extension GoalUnitTypeLabel on GoalUnitType {
   String get displayLabel {
     switch (this) {
-      case GoalUnitType.minutes:
-        return 'Minutes';
       case GoalUnitType.min:
         return 'Min';
       case GoalUnitType.pages:

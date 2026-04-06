@@ -6,17 +6,18 @@ Main
 │   ├── No goals yet
 │   │   └── Create Goal
 │   │       ├── Title (required)
-│   │       ├── Unit type (Minutes, Min, Pages, Steps, …)
+│   │       ├── Unit type (Min, Pages, Steps, Hours, …)
 │   │       ├── Target value
 │   │       ├── Start date (default: today, user-editable)
 │   │       ├── Deadline (optional)
 │   │       └── Simple goal toggle (direct progress, no items)
 │   │
 │   └── Goal list
+│       ├── Overview row (On Track / Needs Pace / Done pill counts)
 │       ├── Goal card (tap → detail, edit button on card)
 │       │   ├── Title + state pill (On Track / Needs Pace / Completed)
 │       │   ├── Progress summary  (completed / target unit)
-│       │   ├── Progress bar (thick, rounded)
+│       │   ├── Progress bar (tall 26px, rounded, % label inside, color by progress)
 │       │   └── Metric tiles — tap any tile → info bottom sheet
 │       │       ├── Done
 │       │       ├── Left
@@ -25,36 +26,41 @@ Main
 │       │       ├── Progress %
 │       │       └── Est. days left
 │       │
-│       └── Goal Details screen
-│           ├── Summary card (title, state pill, target/completed/remaining)
-│           ├── Progress bar (thick, rounded)
-│           ├── Progress heatmap (16 weeks, fit screen)
-│           │   ├── Week-column grid with color intensity
-│           │   ├── Month labels above grid
-│           │   └── Low → High legend below grid
-│           ├── Streak chips (current streak · best streak)
-│           ├── If simple goal
-│           │   └── Quick Progress card + Add Progress FAB
-│           └── If item-based goal
-│               ├── Item list
-│               │   ├── Item card (name, completed/total, progress bar)
-│               │   └── Quick update / Edit / Delete per item
-│               └── Add Item FAB
+│       ├── Goal Details screen
+│       │   ├── Deadline warning banner (red ≤3 days / amber pace-behind 4-7 days)
+│       │   ├── Summary card (title, state pill, target/completed/remaining)
+│       │   ├── Progress bar (tall 26px, rounded, % label inside, color by progress)
+│       │   ├── Progress heatmap (16 weeks, fit screen)
+│       │   │   ├── Week-column grid with color intensity
+│       │   │   ├── Month labels above grid
+│       │   │   └── Low → High legend below grid
+│       │   ├── Streak chips (current streak · best streak)
+│       │   ├── If simple goal
+│       │   │   └── Quick Progress card + Add Progress FAB
+│       │   └── If item-based goal
+│       │       ├── Item list
+│       │       │   ├── Item card (name, completed/total, progress bar)
+│       │       │   └── Quick update / Edit / Delete per item
+│       │       └── Add Item FAB
+│       │
+│       └── Archived Goals section (collapsed at bottom of list)
+│
+└── Friend Profile screen
+    ├── Profile header (avatar, display name, @username, mode, timezone)
+    ├── Tasks section (today's tasks with completion status, read-only)
+    └── Goals section (friend's active goals, read-only)
+        ├── Goal card (title + state pill)
+        ├── Progress bar (tall, rounded, % label inside, color by state)
+        └── Completed / Target unit summary
 
 Add little more detail in Tree and Modify Tree style like this:
-Main
-├── Level 1
-│   └── Level2
-├── Level 1
-│   └── Level 2
 
 -----Don't Update anything bellow this line------
 
 
 Current Problems and Solutions:
-  1. Add Min (minute) option in Goal Unit.
-  2. Follow instructions in the tree
-  2. Make Goal progress bar Thicker and nicer.
+  1. Remove Minutes from Unit List (Keep only Min)
+  2. Make Goal progress bars wider vertically and show percentages inside bar with nice colors.
   3. Test everything you updated in code and comfirm updates are working properly.
   4. Suggest next improvements.
   
