@@ -15,5 +15,20 @@ final currentUserGoalsProvider = StreamProvider<List<Goal>>((ref) {
   if (userId == null) {
     return const Stream<List<Goal>>.empty();
   }
-  return ref.watch(goalRepositoryProvider).watchGoals(userId);
+  return ref
+      .watch(goalRepositoryProvider)
+      .watchGoals(userId)
+      .map((goals) => goals.where((g) => !g.isArchived).toList());
+});
+
+final archivedUserGoalsProvider = StreamProvider<List<Goal>>((ref) {
+  final session = ref.watch(appSessionProvider).valueOrNull;
+  final userId = session?.userId;
+  if (userId == null) {
+    return const Stream<List<Goal>>.empty();
+  }
+  return ref
+      .watch(goalRepositoryProvider)
+      .watchGoals(userId)
+      .map((goals) => goals.where((g) => g.isArchived).toList());
 });

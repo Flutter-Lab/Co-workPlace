@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/app/theme/app_theme.dart';
+import 'package:coworkplace/core/app_constants.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_provider.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_state.dart';
 import 'package:coworkplace/features/auth/presentation/auth_entry_screen.dart';
@@ -73,12 +74,13 @@ class _SessionGate extends ConsumerWidget {
         final stacked = Stack(
           children: [
             child,
-            Positioned(
-              top: 8,
-              left: 12,
-              right: 12,
-              child: SafeArea(child: VoteTicker()),
-            ),
+            if (AppConstants.votingEnabled)
+              Positioned(
+                top: 8,
+                left: 12,
+                right: 12,
+                child: SafeArea(child: VoteTicker()),
+              ),
           ],
         );
 

@@ -1,42 +1,62 @@
 Goal Tracker (Easy Flow)
 ========================
 
-|-- Goals
-|    |
-|    |-- No goals yet
-|    |    `-- Create Goal
-|    |
-|    `-- Goal list
-|         |
-|         |-- See current state (small tap cards)
-|         |    |-- Completed
-|         |    |-- Remaining
-|         |    |-- Daily pace with unit
-|         |    |-- Streak status
-|         |    |-- Progress
-|         |    `-- Estimated days left
-|         |
-|         |-- For simple goals (example: 5000 steps run)
-|         |    `-- Add Progress only
-|         |
-|         `-- Goal Details
-|              |
-|              |-- Progress heatmap (fit screen)
-|              |-- Month labels + legend
-|              |-- If simple goal: Add Progress
-|              |-- If item-based goal: manage items
-|              `-- Edit or Delete goal
-|
+Main
+├── Goals
+│   ├── No goals yet
+│   │   └── Create Goal
+│   │       ├── Title (required)
+│   │       ├── Unit type (Minutes, Min, Pages, Steps, …)
+│   │       ├── Target value
+│   │       ├── Start date (default: today, user-editable)
+│   │       ├── Deadline (optional)
+│   │       └── Simple goal toggle (direct progress, no items)
+│   │
+│   └── Goal list
+│       ├── Goal card (tap → detail, edit button on card)
+│       │   ├── Title + state pill (On Track / Needs Pace / Completed)
+│       │   ├── Progress summary  (completed / target unit)
+│       │   ├── Progress bar (thick, rounded)
+│       │   └── Metric tiles — tap any tile → info bottom sheet
+│       │       ├── Done
+│       │       ├── Left
+│       │       ├── Days (deadline countdown)
+│       │       ├── Pace (unit/day — required or average)
+│       │       ├── Progress %
+│       │       └── Est. days left
+│       │
+│       └── Goal Details screen
+│           ├── Summary card (title, state pill, target/completed/remaining)
+│           ├── Progress bar (thick, rounded)
+│           ├── Progress heatmap (16 weeks, fit screen)
+│           │   ├── Week-column grid with color intensity
+│           │   ├── Month labels above grid
+│           │   └── Low → High legend below grid
+│           ├── Streak chips (current streak · best streak)
+│           ├── If simple goal
+│           │   └── Quick Progress card + Add Progress FAB
+│           └── If item-based goal
+│               ├── Item list
+│               │   ├── Item card (name, completed/total, progress bar)
+│               │   └── Quick update / Edit / Delete per item
+│               └── Add Item FAB
 
+Add little more detail in Tree and Modify Tree style like this:
+Main
+├── Level 1
+│   └── Level2
+├── Level 1
+│   └── Level 2
 
 -----Don't Update anything bellow this line------
 
 
 Current Problems and Solutions:
-  1. Don't show info button. Open a small bottom sheet on tap on Stat card instead of tooltip for mobile friendliness.
-  2. Add unit-aware labels like 120 steps/day instead of only /day.
-  4. Test everything you updated in code and comfirm updates are working properly.
-  5. Suggest next improvements.
+  1. Add Min (minute) option in Goal Unit.
+  2. Follow instructions in the tree
+  2. Make Goal progress bar Thicker and nicer.
+  3. Test everything you updated in code and comfirm updates are working properly.
+  4. Suggest next improvements.
   
 Prompt:
   You are an expert Flutter developer. Now plan the implementation for updates in

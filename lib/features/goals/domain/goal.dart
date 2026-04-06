@@ -1,5 +1,6 @@
 enum GoalUnitType {
   minutes,
+  min,
   pages,
   books,
   count,
@@ -24,8 +25,10 @@ class Goal {
     required this.completedValue,
     required this.itemCount,
     this.isSimpleGoal = false,
+    this.isArchived = false,
     required this.createdAtUtc,
     required this.updatedAtUtc,
+    required this.startDateUtc,
     this.customUnitLabel,
     this.deadlineUtc,
   });
@@ -39,6 +42,8 @@ class Goal {
   final double completedValue;
   final int itemCount;
   final bool isSimpleGoal;
+  final bool isArchived;
+  final DateTime startDateUtc;
   final DateTime? deadlineUtc;
   final DateTime createdAtUtc;
   final DateTime updatedAtUtc;
@@ -51,6 +56,8 @@ class Goal {
     double? completedValue,
     int? itemCount,
     bool? isSimpleGoal,
+    bool? isArchived,
+    DateTime? startDateUtc,
     DateTime? deadlineUtc,
     DateTime? updatedAtUtc,
     bool clearCustomUnitLabel = false,
@@ -68,6 +75,8 @@ class Goal {
       completedValue: completedValue ?? this.completedValue,
       itemCount: itemCount ?? this.itemCount,
       isSimpleGoal: isSimpleGoal ?? this.isSimpleGoal,
+      isArchived: isArchived ?? this.isArchived,
+      startDateUtc: startDateUtc ?? this.startDateUtc,
       deadlineUtc: clearDeadlineUtc ? null : (deadlineUtc ?? this.deadlineUtc),
       createdAtUtc: createdAtUtc,
       updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
@@ -85,6 +94,8 @@ class Goal {
       'completedValue': completedValue,
       'itemCount': itemCount,
       'isSimpleGoal': isSimpleGoal,
+      'isArchived': isArchived,
+      'startDateUtc': startDateUtc.toIso8601String(),
       'deadlineUtc': deadlineUtc?.toIso8601String(),
       'createdAtUtc': createdAtUtc.toIso8601String(),
       'updatedAtUtc': updatedAtUtc.toIso8601String(),
@@ -111,6 +122,10 @@ class Goal {
       completedValue: (map['completedValue'] as num?)?.toDouble() ?? 0,
       itemCount: (map['itemCount'] as num?)?.toInt() ?? 0,
       isSimpleGoal: map['isSimpleGoal'] as bool? ?? false,
+      isArchived: map['isArchived'] as bool? ?? false,
+      startDateUtc: map['startDateUtc'] != null
+          ? DateTime.parse(map['startDateUtc'] as String).toUtc()
+          : DateTime.parse(map['createdAtUtc'] as String).toUtc(),
       deadlineUtc: map['deadlineUtc'] == null
           ? null
           : DateTime.parse(map['deadlineUtc'] as String).toUtc(),
@@ -125,6 +140,8 @@ extension GoalUnitTypeLabel on GoalUnitType {
     switch (this) {
       case GoalUnitType.minutes:
         return 'Minutes';
+      case GoalUnitType.min:
+        return 'Min';
       case GoalUnitType.pages:
         return 'Pages';
       case GoalUnitType.books:

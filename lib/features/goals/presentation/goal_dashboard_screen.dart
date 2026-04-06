@@ -56,50 +56,53 @@ class GoalDashboardScreen extends ConsumerWidget {
                 );
               }
 
-              return ListView.separated(
+              return ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                itemCount: goals.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final goal = goals[index];
-                  final metrics = GoalMetrics.compute(
-                    targetValue: goal.targetValue,
-                    completedValue: goal.completedValue,
-                    createdAtUtc: goal.createdAtUtc,
-                    deadlineUtc: goal.deadlineUtc,
-                  );
-
-                  return _GoalCard(
-                    goal: goal,
-                    metrics: metrics,
-                    onViewDetails: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              GoalDetailScreen(userId: userId, goalId: goal.id),
-                        ),
-                      );
-                    },
-                    onAddItem: () => _onCreateItem(
-                      context: context,
-                      ref: ref,
-                      userId: userId,
-                      goalId: goal.id,
-                    ),
-                    onAddProgress: () => _onAddSimpleProgress(
-                      context: context,
-                      ref: ref,
-                      userId: userId,
-                      goalId: goal.id,
-                    ),
-                    onEdit: () => _onEditGoal(
-                      context: context,
-                      ref: ref,
-                      userId: userId,
+                children: [
+                  _GoalOverviewCard(goals: goals),
+                  const SizedBox(height: 16),
+                  for (final goal in goals) ...[
+                    _GoalCard(
                       goal: goal,
+                      metrics: GoalMetrics.compute(
+                        targetValue: goal.targetValue,
+                        completedValue: goal.completedValue,
+                        createdAtUtc: goal.startDateUtc,
+                        deadlineUtc: goal.deadlineUtc,
+                      ),
+                      onViewDetails: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => GoalDetailScreen(
+                              userId: userId,
+                              goalId: goal.id,
+                            ),
+                          ),
+                        );
+                      },
+                      onAddItem: () => _onCreateItem(
+                        context: context,
+                        ref: ref,
+                        userId: userId,
+                        goalId: goal.id,
+                      ),
+                      onAddProgress: () => _onAddSimpleProgress(
+                        context: context,
+                        ref: ref,
+                        userId: userId,
+                        goalId: goal.id,
+                      ),
+                      onEdit: () => _onEditGoal(
+                        context: context,
+                        ref: ref,
+                        userId: userId,
+                        goal: goal,
+                      ),
                     ),
-                  );
-                },
+                    const SizedBox(height: 12),
+                  ],
+                  _ArchivedGoalsSection(userId: userId),
+                ],
               );
             },
           ),
@@ -127,6 +130,7 @@ class GoalDashboardScreen extends ConsumerWidget {
             unitType: draft.unitType,
             customUnitLabel: draft.customUnitLabel,
             targetValue: draft.targetValue,
+            startDateUtc: draft.startDateUtc,
             deadlineUtc: draft.deadlineUtc,
             isSimpleGoal: draft.isSimpleGoal,
           );
@@ -157,6 +161,7 @@ class GoalDashboardScreen extends ConsumerWidget {
       customUnitLabel: draft.customUnitLabel,
       targetValue: draft.targetValue,
       isSimpleGoal: draft.isSimpleGoal,
+      startDateUtc: draft.startDateUtc,
       deadlineUtc: draft.deadlineUtc,
       clearCustomUnitLabel: draft.unitType != GoalUnitType.custom,
       clearDeadlineUtc: draft.deadlineUtc == null,
@@ -268,7 +273,7 @@ class GoalDetailScreen extends ConsumerWidget {
         final metrics = GoalMetrics.compute(
           targetValue: goal.targetValue,
           completedValue: goal.completedValue,
-          createdAtUtc: goal.createdAtUtc,
+          createdAtUtc: goal.startDateUtc,
           deadlineUtc: goal.deadlineUtc,
         );
 
@@ -280,6 +285,17 @@ class GoalDetailScreen extends ConsumerWidget {
                 tooltip: 'Edit goal',
                 onPressed: () => _editGoal(context, ref, goal),
                 icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
+                tooltip: goal.isArchived ? 'Unarchive goal' : 'Archive goal',
+                onPressed: () => goal.isArchived
+                    ? _unarchiveGoal(context, ref, goal.id)
+                    : _archiveGoal(context, ref, goal.id),
+                icon: Icon(
+                  goal.isArchived
+                      ? Icons.unarchive_outlined
+                      : Icons.archive_outlined,
+                ),
               ),
               IconButton(
                 tooltip: 'Delete goal',
@@ -406,6 +422,7 @@ class GoalDetailScreen extends ConsumerWidget {
       customUnitLabel: draft.customUnitLabel,
       targetValue: draft.targetValue,
       isSimpleGoal: draft.isSimpleGoal,
+      startDateUtc: draft.startDateUtc,
       deadlineUtc: draft.deadlineUtc,
       clearCustomUnitLabel: draft.unitType != GoalUnitType.custom,
       clearDeadlineUtc: draft.deadlineUtc == null,
@@ -422,6 +439,49 @@ class GoalDetailScreen extends ConsumerWidget {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not update goal: $e')));
+    }
+  }
+
+  Future<void> _archiveGoal(
+    BuildContext context,
+    WidgetRef ref,
+    String goalId,
+  ) async {
+    try {
+      await ref
+          .read(goalRepositoryProvider)
+          .archiveGoal(userId: userId, goalId: goalId);
+      if (!context.mounted) return;
+      Navigator.of(context).maybePop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Goal archived')));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not archive goal: $e')));
+    }
+  }
+
+  Future<void> _unarchiveGoal(
+    BuildContext context,
+    WidgetRef ref,
+    String goalId,
+  ) async {
+    try {
+      await ref
+          .read(goalRepositoryProvider)
+          .unarchiveGoal(userId: userId, goalId: goalId);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Goal unarchived')));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not unarchive goal: $e')));
     }
   }
 
@@ -678,7 +738,11 @@ class _GoalCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 10),
-              LinearProgressIndicator(value: metrics.progressPercent / 100),
+              LinearProgressIndicator(
+                value: metrics.progressPercent / 100,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(4),
+              ),
               const SizedBox(height: 10),
               _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
               const SizedBox(height: 12),
@@ -759,7 +823,11 @@ class _GoalSummaryCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 10),
-            LinearProgressIndicator(value: metrics.progressPercent / 100),
+            LinearProgressIndicator(
+              value: metrics.progressPercent / 100,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
             const SizedBox(height: 10),
             _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
           ],
@@ -948,17 +1016,39 @@ Future<void> _showStateInfoSheet(
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
     builder: (context) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(message, style: Theme.of(context).textTheme.bodyMedium),
-          ],
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(message, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       );
     },
@@ -1402,7 +1492,11 @@ class _GoalItemCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
-            LinearProgressIndicator(value: item.progressPercent / 100),
+            LinearProgressIndicator(
+              value: item.progressPercent / 100,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
             const SizedBox(height: 6),
             Text('Progress: ${item.progressPercent.toStringAsFixed(1)}%'),
             if (item.note?.isNotEmpty == true) ...[
@@ -1488,6 +1582,7 @@ class _GoalFormDraft {
     required this.unitType,
     required this.customUnitLabel,
     required this.targetValue,
+    required this.startDateUtc,
     required this.deadlineUtc,
     required this.isSimpleGoal,
   });
@@ -1496,6 +1591,7 @@ class _GoalFormDraft {
   final GoalUnitType unitType;
   final String? customUnitLabel;
   final double targetValue;
+  final DateTime startDateUtc;
   final DateTime? deadlineUtc;
   final bool isSimpleGoal;
 }
@@ -1638,6 +1734,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
 
   late GoalUnitType _unitType;
   late bool _isSimpleGoal;
+  late DateTime _startDateUtc;
   DateTime? _deadlineUtc;
 
   @override
@@ -1653,6 +1750,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
     );
     _unitType = existing?.unitType ?? GoalUnitType.minutes;
     _isSimpleGoal = existing?.isSimpleGoal ?? false;
+    _startDateUtc = existing?.startDateUtc ?? DateTime.now().toUtc();
     _deadlineUtc = existing?.deadlineUtc;
   }
 
@@ -1773,6 +1871,19 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
               const SizedBox(height: 4),
               ListTile(
                 contentPadding: EdgeInsets.zero,
+                title: const Text('Start date'),
+                subtitle: Text(
+                  DateFormat('dd MMM yyyy').format(_startDateUtc.toLocal()),
+                ),
+                trailing: IconButton(
+                  tooltip: 'Pick start date',
+                  onPressed: _pickStartDate,
+                  icon: const Icon(Icons.date_range_outlined),
+                ),
+              ),
+              const SizedBox(height: 4),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
                 title: const Text('Deadline'),
                 subtitle: Text(
                   _deadlineUtc == null
@@ -1819,6 +1930,23 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
     );
   }
 
+  Future<void> _pickStartDate() async {
+    final now = DateTime.now();
+    final initialDate = _startDateUtc.toLocal();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: now.subtract(const Duration(days: 3650)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked == null) {
+      return;
+    }
+    setState(() {
+      _startDateUtc = DateTime.utc(picked.year, picked.month, picked.day);
+    });
+  }
+
   Future<void> _pickDeadline() async {
     final now = DateTime.now();
     final initialDate = _deadlineUtc?.toLocal() ?? now;
@@ -1862,6 +1990,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
             ? null
             : customUnit,
         targetValue: targetValue,
+        startDateUtc: _startDateUtc,
         deadlineUtc: _deadlineUtc,
         isSimpleGoal: _isSimpleGoal,
       ),
@@ -2024,4 +2153,190 @@ String _formatNumber(double value) {
     return value.toStringAsFixed(0);
   }
   return value.toStringAsFixed(1);
+}
+
+// ── Goal Overview Card ────────────────────────────────────────────────────────
+
+class _GoalOverviewCard extends StatelessWidget {
+  const _GoalOverviewCard({required this.goals});
+
+  final List<Goal> goals;
+
+  @override
+  Widget build(BuildContext context) {
+    int doneCount = 0;
+    int onTrackCount = 0;
+    int needsPaceCount = 0;
+
+    for (final goal in goals) {
+      final metrics = GoalMetrics.compute(
+        targetValue: goal.targetValue,
+        completedValue: goal.completedValue,
+        createdAtUtc: goal.startDateUtc,
+        deadlineUtc: goal.deadlineUtc,
+      );
+      final state = _goalStateInfo(metrics);
+      if (state.label == 'Completed') {
+        doneCount++;
+      } else if (state.label == 'Needs Pace') {
+        needsPaceCount++;
+      } else {
+        onTrackCount++;
+      }
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.track_changes, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  'Goal Overview',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                Text(
+                  '${goals.length} active',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _OverviewPill(
+                  value: onTrackCount,
+                  label: 'On Track',
+                  color: const Color(0xFF3B82F6),
+                ),
+                const SizedBox(width: 8),
+                _OverviewPill(
+                  value: needsPaceCount,
+                  label: 'Needs Pace',
+                  color: const Color(0xFFF59E0B),
+                ),
+                const SizedBox(width: 8),
+                _OverviewPill(
+                  value: doneCount,
+                  label: 'Done',
+                  color: const Color(0xFF22C55E),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OverviewPill extends StatelessWidget {
+  const _OverviewPill({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  final int value;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withAlpha(26),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withAlpha(80)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$value',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Archived Goals Section ────────────────────────────────────────────────────
+
+class _ArchivedGoalsSection extends ConsumerWidget {
+  const _ArchivedGoalsSection({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final archivedAsync = ref.watch(archivedUserGoalsProvider);
+
+    return archivedAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (archived) {
+        if (archived.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.archive_outlined, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Archived (${archived.length})',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ],
+              ),
+            ),
+            ...archived.map(
+              (goal) => ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.archive, size: 20),
+                title: Text(goal.title),
+                subtitle: Text(
+                  '${_formatNumber(goal.completedValue)} / ${_formatNumber(goal.targetValue)} ${_goalUnitLabel(goal)}',
+                ),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        GoalDetailScreen(userId: userId, goalId: goal.id),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }

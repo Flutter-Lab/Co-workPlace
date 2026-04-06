@@ -52,6 +52,7 @@ void main() {
       targetValue: 5000,
       completedValue: 1200,
       itemCount: 2,
+      startDateUtc: DateTime.utc(2026, 4, 1),
       createdAtUtc: DateTime.utc(2026, 4, 1),
       updatedAtUtc: DateTime.utc(2026, 4, 5),
     );
@@ -107,6 +108,7 @@ void main() {
       completedValue: 1200,
       itemCount: 0,
       isSimpleGoal: true,
+      startDateUtc: DateTime.utc(2026, 4, 1),
       createdAtUtc: DateTime.utc(2026, 4, 1),
       updatedAtUtc: DateTime.utc(2026, 4, 5),
     );

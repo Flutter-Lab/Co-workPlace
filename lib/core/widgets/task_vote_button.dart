@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/core/app_constants.dart';
 import 'package:coworkplace/features/leaderboard/data/score_service.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
@@ -107,6 +108,8 @@ class _TaskVoteButtonState extends ConsumerState<TaskVoteButton>
 
   @override
   Widget build(BuildContext context) {
+    if (!AppConstants.votingEnabled) return const SizedBox.shrink();
+
     final sessionAsync = ref.watch(appSessionProvider);
     final viewerId = sessionAsync.valueOrNull?.userId;
 

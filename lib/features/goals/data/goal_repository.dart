@@ -64,6 +64,7 @@ class GoalRepository {
     required GoalUnitType unitType,
     String? customUnitLabel,
     required double targetValue,
+    DateTime? startDateUtc,
     DateTime? deadlineUtc,
     bool isSimpleGoal = false,
   }) async {
@@ -92,6 +93,7 @@ class GoalRepository {
       completedValue: 0,
       itemCount: 0,
       isSimpleGoal: isSimpleGoal,
+      startDateUtc: (startDateUtc ?? nowUtc).toUtc(),
       deadlineUtc: deadlineUtc?.toUtc(),
       createdAtUtc: nowUtc,
       updatedAtUtc: nowUtc,
@@ -150,6 +152,26 @@ class GoalRepository {
 
     batch.delete(_goals(userId).doc(goalId));
     await batch.commit();
+  }
+
+  Future<void> archiveGoal({
+    required String userId,
+    required String goalId,
+  }) async {
+    await _goals(userId).doc(goalId).update({
+      'isArchived': true,
+      'updatedAtUtc': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  Future<void> unarchiveGoal({
+    required String userId,
+    required String goalId,
+  }) async {
+    await _goals(userId).doc(goalId).update({
+      'isArchived': false,
+      'updatedAtUtc': DateTime.now().toUtc().toIso8601String(),
+    });
   }
 
   Future<void> addSimpleProgress({
