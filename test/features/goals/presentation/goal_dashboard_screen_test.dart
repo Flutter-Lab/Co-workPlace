@@ -87,6 +87,13 @@ void main() {
 
     expect(find.text('Run Goal'), findsOneWidget);
     expect(find.textContaining('1200 / 5000 steps'), findsOneWidget);
+    expect(find.text('Done'), findsWidgets);
+    expect(find.text('Left'), findsWidgets);
+    expect(find.text('Days'), findsWidgets);
+    expect(find.text('Pace'), findsWidgets);
+    expect(find.textContaining('steps/day'), findsWidgets);
+    expect(find.text('Progress'), findsWidgets);
+    expect(find.text('Est. days'), findsWidgets);
     expect(find.text('Details'), findsOneWidget);
   });
 

@@ -680,7 +680,7 @@ class _GoalCard extends StatelessWidget {
               const SizedBox(height: 10),
               LinearProgressIndicator(value: metrics.progressPercent / 100),
               const SizedBox(height: 10),
-              _GoalMetricsWrap(metrics: metrics),
+              _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -761,7 +761,7 @@ class _GoalSummaryCard extends StatelessWidget {
             const SizedBox(height: 10),
             LinearProgressIndicator(value: metrics.progressPercent / 100),
             const SizedBox(height: 10),
-            _GoalMetricsWrap(metrics: metrics),
+            _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
           ],
         ),
       ),
@@ -770,80 +770,199 @@ class _GoalSummaryCard extends StatelessWidget {
 }
 
 class _GoalMetricsWrap extends StatelessWidget {
-  const _GoalMetricsWrap({required this.metrics});
+  const _GoalMetricsWrap({required this.metrics, required this.unitLabel});
 
   final GoalMetrics metrics;
+  final String unitLabel;
 
   @override
   Widget build(BuildContext context) {
-    final estimatedDate = metrics.estimatedCompletionUtc == null
+    final expectedRemainingDays = metrics.estimatedDaysToTarget == null
         ? '-'
-        : DateFormat(
-            'dd MMM yyyy',
-          ).format(metrics.estimatedCompletionUtc!.toLocal());
+        : '${metrics.estimatedDaysToTarget!.ceil()}';
+    final paceValue = metrics.requiredPerDay ?? metrics.averagePerDay;
 
-    final rows = [
-      [
-        _MetricPair(
-          label: 'Progress',
-          value: '${metrics.progressPercent.toStringAsFixed(1)}%',
-        ),
-        _MetricPair(
-          label: 'Avg/day',
-          value: _formatNumber(metrics.averagePerDay),
-        ),
-      ],
-      [
-        _MetricPair(
-          label: 'Remaining days',
-          value: metrics.remainingDays == null
-              ? '-'
-              : '${metrics.remainingDays}',
-        ),
-        _MetricPair(
-          label: 'Need/day',
-          value: metrics.requiredPerDay == null
-              ? '-'
-              : _formatNumber(metrics.requiredPerDay!),
-        ),
-      ],
-      [
-        _MetricPair(
-          label: 'Est. days',
-          value: metrics.estimatedDaysToTarget == null
-              ? '-'
-              : _formatNumber(metrics.estimatedDaysToTarget!),
-        ),
-        _MetricPair(label: 'Est. completion', value: estimatedDate),
-      ],
+    final tiles = [
+      _GoalStateTile(
+        icon: Icons.trending_up,
+        iconColor: const Color(0xFF22C55E),
+        value: _formatNumber(metrics.completed),
+        label: 'Done',
+        infoTitle: 'Done',
+        infoText: 'How much of the goal is already completed.',
+      ),
+      _GoalStateTile(
+        icon: Icons.access_time_outlined,
+        iconColor: const Color(0xFFF59E0B),
+        value: _formatNumber(metrics.remaining),
+        label: 'Left',
+        infoTitle: 'Left',
+        infoText: 'How much is still left to finish.',
+      ),
+      _GoalStateTile(
+        icon: Icons.calendar_today_outlined,
+        iconColor: const Color(0xFF3B82F6),
+        value: metrics.remainingDays == null ? '-' : '${metrics.remainingDays}',
+        label: 'Days',
+        infoTitle: 'Days',
+        infoText: 'Days remaining until the deadline.',
+      ),
+      _GoalStateTile(
+        icon: Icons.auto_graph_outlined,
+        iconColor: const Color(0xFF10B981),
+        value: '${_formatNumber(paceValue)} $unitLabel/day',
+        label: 'Pace',
+        infoTitle: 'Daily Pace',
+        infoText: 'Average or required progress per day in the goal unit.',
+      ),
+      _GoalStateTile(
+        icon: Icons.pie_chart_outline,
+        iconColor: const Color(0xFF8B5CF6),
+        value: '${metrics.progressPercent.toStringAsFixed(1)}%',
+        label: 'Progress',
+        infoTitle: 'Progress',
+        infoText: 'Overall completion percentage of the goal.',
+      ),
+      _GoalStateTile(
+        icon: Icons.hourglass_bottom_outlined,
+        iconColor: const Color(0xFFEC4899),
+        value: expectedRemainingDays,
+        label: 'Est. days',
+        infoTitle: 'Estimated Days Left',
+        infoText: 'Estimated remaining days at the current pace.',
+      ),
     ];
 
-    return Column(
-      children: rows.map((row) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: _MetricChip(label: row[0].label, value: row[0].value),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _MetricChip(label: row[1].label, value: row[1].value),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: tiles.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1.05,
+      ),
+      itemBuilder: (context, index) => tiles[index],
     );
   }
 }
 
-class _MetricPair {
-  const _MetricPair({required this.label, required this.value});
+class _GoalStateTile extends StatelessWidget {
+  const _GoalStateTile({
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    required this.label,
+    required this.infoTitle,
+    required this.infoText,
+  });
 
-  final String label;
+  final IconData icon;
+  final Color iconColor;
   final String value;
+  final String label;
+  final String infoTitle;
+  final String infoText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () =>
+            _showStateInfoSheet(context, title: infoTitle, message: infoText),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: iconColor, size: 16),
+              const SizedBox(height: 6),
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(
+                  begin: 0,
+                  end:
+                      double.tryParse(
+                        value
+                            .replaceAll('%', '')
+                            .replaceAll(RegExp(r'[^0-9.\-]'), ''),
+                      ) ??
+                      0,
+                ),
+                duration: const Duration(milliseconds: 450),
+                curve: Curves.easeOut,
+                builder: (context, animatedValue, child) {
+                  final display = value.contains('%')
+                      ? '${animatedValue.toStringAsFixed(1)}%'
+                      : (value == '-'
+                            ? '-'
+                            : _animatedDisplayTemplate(
+                                original: value,
+                                animatedValue: animatedValue,
+                              ));
+                  return Text(
+                    display,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _animatedDisplayTemplate({
+  required String original,
+  required double animatedValue,
+}) {
+  final numeric = _formatNumber(animatedValue);
+  if (original.contains('/day')) {
+    final suffix = original.substring(original.indexOf(' ')).trim();
+    return '$numeric $suffix';
+  }
+  return original == '-' ? '-' : numeric;
+}
+
+Future<void> _showStateInfoSheet(
+  BuildContext context, {
+  required String title,
+  required String message,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(message, style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 class _GoalStateInfo {
