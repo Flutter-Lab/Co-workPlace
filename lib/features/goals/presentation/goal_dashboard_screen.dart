@@ -40,71 +40,79 @@ class GoalDashboardScreen extends ConsumerWidget {
             icon: const Icon(Icons.add),
             label: const Text('New Goal'),
           ),
-          body: goalsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stackTrace) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('Failed to load goals: $error'),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: goalsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stackTrace) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('Failed to load goals: $error'),
+                  ),
+                ),
+                data: (goals) {
+                  if (goals.isEmpty) {
+                    return _GoalEmptyState(
+                      onCreate: () => _onCreateGoal(
+                        context: context,
+                        ref: ref,
+                        userId: userId,
+                      ),
+                    );
+                  }
+
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                    children: [
+                      _GoalOverviewCard(goals: goals),
+                      const SizedBox(height: 16),
+                      for (final goal in goals) ...[
+                        _GoalCard(
+                          goal: goal,
+                          metrics: GoalMetrics.compute(
+                            targetValue: goal.targetValue,
+                            completedValue: goal.completedValue,
+                            createdAtUtc: goal.startDateUtc,
+                            deadlineUtc: goal.deadlineUtc,
+                          ),
+                          onViewDetails: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => GoalDetailScreen(
+                                  userId: userId,
+                                  goalId: goal.id,
+                                ),
+                              ),
+                            );
+                          },
+                          onAddItem: () => _onCreateItem(
+                            context: context,
+                            ref: ref,
+                            userId: userId,
+                            goalId: goal.id,
+                          ),
+                          onAddProgress: () => _onAddSimpleProgress(
+                            context: context,
+                            ref: ref,
+                            userId: userId,
+                            goalId: goal.id,
+                          ),
+                          onEdit: () => _onEditGoal(
+                            context: context,
+                            ref: ref,
+                            userId: userId,
+                            goal: goal,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      _ArchivedGoalsSection(userId: userId),
+                    ],
+                  );
+                },
               ),
             ),
-            data: (goals) {
-              if (goals.isEmpty) {
-                return _GoalEmptyState(
-                  onCreate: () =>
-                      _onCreateGoal(context: context, ref: ref, userId: userId),
-                );
-              }
-
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                children: [
-                  _GoalOverviewCard(goals: goals),
-                  const SizedBox(height: 16),
-                  for (final goal in goals) ...[
-                    _GoalCard(
-                      goal: goal,
-                      metrics: GoalMetrics.compute(
-                        targetValue: goal.targetValue,
-                        completedValue: goal.completedValue,
-                        createdAtUtc: goal.startDateUtc,
-                        deadlineUtc: goal.deadlineUtc,
-                      ),
-                      onViewDetails: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => GoalDetailScreen(
-                              userId: userId,
-                              goalId: goal.id,
-                            ),
-                          ),
-                        );
-                      },
-                      onAddItem: () => _onCreateItem(
-                        context: context,
-                        ref: ref,
-                        userId: userId,
-                        goalId: goal.id,
-                      ),
-                      onAddProgress: () => _onAddSimpleProgress(
-                        context: context,
-                        ref: ref,
-                        userId: userId,
-                        goalId: goal.id,
-                      ),
-                      onEdit: () => _onEditGoal(
-                        context: context,
-                        ref: ref,
-                        userId: userId,
-                        goal: goal,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  _ArchivedGoalsSection(userId: userId),
-                ],
-              );
-            },
           ),
         );
       },
@@ -744,27 +752,30 @@ class _GoalCard extends StatelessWidget {
               const SizedBox(height: 10),
               _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (goal.isSimpleGoal)
-                    FilledButton.icon(
-                      onPressed: onAddProgress,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Progress'),
-                    )
-                  else
-                    OutlinedButton.icon(
-                      onPressed: onAddItem,
-                      icon: const Icon(Icons.playlist_add),
-                      label: const Text('Add Item'),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    if (goal.isSimpleGoal)
+                      OutlinedButton.icon(
+                        onPressed: onAddProgress,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Progress'),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: onAddItem,
+                        icon: const Icon(Icons.playlist_add),
+                        label: const Text('Add Item'),
+                      ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: onViewDetails,
+                      icon: const Icon(Icons.arrow_forward),
+                      label: const Text('Details'),
                     ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: onViewDetails,
-                    icon: const Icon(Icons.arrow_forward),
-                    label: const Text('Details'),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -1203,7 +1214,7 @@ class _SimpleGoalProgressCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 10),
-            FilledButton.icon(
+            TextButton.icon(
               onPressed: onAddProgress,
               icon: const Icon(Icons.add),
               label: const Text('Add Progress'),
@@ -2250,28 +2261,33 @@ class _GoalProgressBar extends StatelessWidget {
     }
 
     // Label is white when fill covers > 50% of the bar, otherwise use fill color.
-    final labelColor = fillFraction >= 0.5 ? Colors.white : fillColor;
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: SizedBox(
         height: 26,
-        child: Stack(
+        child: Row(
           children: [
-            Container(color: fillColor.withAlpha(30)),
-            FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: fillFraction,
-              child: Container(decoration: BoxDecoration(color: fillColor)),
+            Flexible(
+              child: Stack(
+                children: [
+                  Container(color: fillColor.withAlpha(30)),
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: fillFraction,
+                    child: Container(
+                      decoration: BoxDecoration(color: fillColor),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Center(
-              child: Text(
-                '${clamped.toStringAsFixed(1)}%',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: labelColor,
-                ),
+            const SizedBox(width: 8),
+            Text(
+              '${clamped.toStringAsFixed(1)}%',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: fillColor,
               ),
             ),
           ],

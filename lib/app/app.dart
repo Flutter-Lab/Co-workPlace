@@ -84,7 +84,17 @@ class _SessionGate extends ConsumerWidget {
           ],
         );
 
-        return _BootstrapWarningOverlay(state: bootstrapState, child: stacked);
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: ClipRect(
+              child: _BootstrapWarningOverlay(
+                state: bootstrapState,
+                child: stacked,
+              ),
+            ),
+          ),
+        );
       },
     );
   }
