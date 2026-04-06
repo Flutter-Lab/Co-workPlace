@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/features/goals/domain/goal.dart';
 import 'package:coworkplace/features/goals/domain/goal_item.dart';
@@ -334,6 +336,10 @@ class GoalDetailScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                   children: [
                     _DeadlineWarningBanner(goal: goal, metrics: metrics),
+                    if (metrics.remaining <= 0) ...[
+                      const SizedBox(height: 8),
+                      const _CompletionCelebrationCard(),
+                    ],
                     _GoalSummaryCard(goal: goal, metrics: metrics),
                     const SizedBox(height: 12),
                     _SimpleGoalProgressCard(
@@ -359,6 +365,10 @@ class GoalDetailScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     children: [
                       _DeadlineWarningBanner(goal: goal, metrics: metrics),
+                      if (metrics.remaining <= 0) ...[
+                        const SizedBox(height: 8),
+                        const _CompletionCelebrationCard(),
+                      ],
                       _GoalSummaryCard(goal: goal, metrics: metrics),
                       const SizedBox(height: 12),
                       _GoalHeatmapCard(dailyProgress: dailyProgress),
@@ -748,7 +758,10 @@ class _GoalCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 10),
-              _GoalProgressBar(percent: metrics.progressPercent),
+              _GoalProgressBar(
+                percent: metrics.progressPercent,
+                color: _goalBarColor(goal.id),
+              ),
               const SizedBox(height: 10),
               _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
               const SizedBox(height: 12),
@@ -832,7 +845,10 @@ class _GoalSummaryCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 10),
-            _GoalProgressBar(percent: metrics.progressPercent),
+            _GoalProgressBar(
+              percent: metrics.progressPercent,
+              color: _goalBarColor(goal.id),
+            ),
             const SizedBox(height: 10),
             _GoalMetricsWrap(metrics: metrics, unitLabel: unit),
           ],
@@ -2140,6 +2156,21 @@ class _GoalItemFormSheetState extends State<_GoalItemFormSheet> {
   }
 }
 
+// Per-goal accent colors — consistent across sessions (hash-based, not progress-based).
+const _kGoalPalette = [
+  Color(0xFF0EA5E9), // sky
+  Color(0xFF8B5CF6), // violet
+  Color(0xFF10B981), // emerald
+  Color(0xFFF43F5E), // rose
+  Color(0xFF06B6D4), // cyan
+  Color(0xFFF97316), // orange
+  Color(0xFF6366F1), // indigo
+  Color(0xFFEC4899), // pink
+];
+
+Color _goalBarColor(String goalId) =>
+    _kGoalPalette[goalId.hashCode.abs() % _kGoalPalette.length];
+
 String _goalUnitLabel(Goal goal) {
   if (goal.unitType == GoalUnitType.custom && goal.customUnitLabel != null) {
     return goal.customUnitLabel!;
@@ -2242,25 +2273,26 @@ class _DeadlineWarningBanner extends StatelessWidget {
 // ── Goal Progress Bar ─────────────────────────────────────────────────────────
 
 class _GoalProgressBar extends StatelessWidget {
-  const _GoalProgressBar({required this.percent});
+  const _GoalProgressBar({required this.percent, this.color});
 
   final double percent; // 0.0 – 100.0
+  /// Optional accent color; falls back to progress-threshold palette.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final clamped = percent.clamp(0.0, 100.0);
     final fillFraction = clamped / 100;
 
-    final Color fillColor;
-    if (clamped >= 75) {
-      fillColor = const Color(0xFF22C55E); // green
-    } else if (clamped >= 35) {
-      fillColor = const Color(0xFF3B82F6); // blue
-    } else {
-      fillColor = const Color(0xFFF59E0B); // amber
-    }
+    final fillColor =
+        color ??
+        (clamped >= 75
+            ? const Color(0xFF22C55E)
+            : clamped >= 35
+            ? const Color(0xFF3B82F6)
+            : const Color(0xFFF59E0B));
 
-    // Label is white when fill covers > 50% of the bar, otherwise use fill color.
+    // Label is right-aligned using fill color.
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: SizedBox(
@@ -2295,6 +2327,146 @@ class _GoalProgressBar extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Goal Completion Celebration ────────────────────────────────────────────────
+
+class _CompletionCelebrationCard extends StatefulWidget {
+  const _CompletionCelebrationCard();
+
+  @override
+  State<_CompletionCelebrationCard> createState() =>
+      _CompletionCelebrationCardState();
+}
+
+class _CompletionCelebrationCardState extends State<_CompletionCelebrationCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+    // Stop after two cycles.
+    Future.delayed(const Duration(milliseconds: 3400), () {
+      if (mounted) _ctrl.stop();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) => Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFDCFCE7),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF22C55E).withAlpha(80)),
+        ),
+        child: SizedBox(
+          height: 72,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CustomPaint(
+                    painter: _SparklesPainter(progress: _ctrl.value),
+                  ),
+                ),
+              ),
+              child!,
+            ],
+          ),
+        ),
+      ),
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.celebration, color: Color(0xFF22C55E), size: 26),
+            const SizedBox(width: 8),
+            Text(
+              'Goal Complete!',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: const Color(0xFF166534),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SparklesPainter extends CustomPainter {
+  const _SparklesPainter({required this.progress});
+
+  final double progress;
+
+  static const _bxs = [
+    0.08,
+    0.18,
+    0.32,
+    0.50,
+    0.62,
+    0.74,
+    0.85,
+    0.92,
+    0.44,
+    0.14,
+    0.58,
+    0.28,
+  ];
+  static const _bys = [
+    0.30,
+    0.75,
+    0.20,
+    0.85,
+    0.15,
+    0.72,
+    0.38,
+    0.18,
+    0.55,
+    0.90,
+    0.65,
+    0.50,
+  ];
+  static const _cis = [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1];
+  static const _colors = [
+    Color(0xFF22C55E),
+    Color(0xFFF59E0B),
+    Color(0xFF3B82F6),
+    Color(0xFFEC4899),
+    Color(0xFF8B5CF6),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var i = 0; i < _bxs.length; i++) {
+      final phase = math.sin(progress * math.pi * 2 + _cis[i] * 0.8);
+      final opacity = ((phase + 1) / 2).clamp(0.15, 1.0);
+      final radius = (3.0 + (_cis[i] % 3) + phase * 1.5).abs();
+      canvas.drawCircle(
+        Offset(_bxs[i] * size.width, _bys[i] * size.height),
+        radius,
+        Paint()..color = _colors[_cis[i]].withValues(alpha: opacity),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SparklesPainter old) => old.progress != progress;
 }
 
 // ── Goal Overview Card ────────────────────────────────────────────────────────

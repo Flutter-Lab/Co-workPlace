@@ -204,7 +204,6 @@ class _FriendGoalsSection extends ConsumerWidget {
       data: (goals) {
         if (goals.isEmpty) return const SizedBox.shrink();
 
-        final colorScheme = Theme.of(context).colorScheme;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -217,9 +216,7 @@ class _FriendGoalsSection extends ConsumerWidget {
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
-            ...goals.map(
-              (goal) => _FriendGoalCard(goal: goal, colorScheme: colorScheme),
-            ),
+            ...goals.map((goal) => _FriendGoalCard(goal: goal)),
           ],
         );
       },
@@ -228,10 +225,9 @@ class _FriendGoalsSection extends ConsumerWidget {
 }
 
 class _FriendGoalCard extends StatelessWidget {
-  const _FriendGoalCard({required this.goal, required this.colorScheme});
+  const _FriendGoalCard({required this.goal});
 
   final Goal goal;
-  final ColorScheme colorScheme;
 
   @override
   Widget build(BuildContext context) {
@@ -245,23 +241,23 @@ class _FriendGoalCard extends StatelessWidget {
     final pct = metrics.progressPercent;
     final isDone = metrics.remaining <= 0;
 
-    Color barColor;
-    String stateLabel;
-    Color stateColor;
+    final Color barColor;
+    final String stateLabel;
+    final Color stateColor;
 
     if (isDone) {
-      barColor = Colors.green;
+      barColor = const Color(0xFF22C55E);
       stateLabel = 'Done';
-      stateColor = Colors.green;
+      stateColor = const Color(0xFF166534);
     } else if (metrics.requiredPerDay != null &&
         metrics.averagePerDay < metrics.requiredPerDay!) {
-      barColor = const Color(0xFFFFA726); // amber
+      barColor = const Color(0xFFF59E0B);
       stateLabel = 'Needs Pace';
-      stateColor = Colors.orange;
+      stateColor = const Color(0xFF92400E);
     } else {
-      barColor = colorScheme.primary;
+      barColor = const Color(0xFF3B82F6);
       stateLabel = 'On Track';
-      stateColor = Colors.blue;
+      stateColor = const Color(0xFF1E3A8A);
     }
 
     final unitLabel =
@@ -305,34 +301,37 @@ class _FriendGoalCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            // Progress bar
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: SizedBox(
-                height: 22,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ColoredBox(color: barColor.withValues(alpha: 0.18)),
-                    FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
-                      widthFactor: (pct / 100).clamp(0.0, 1.0),
-                      child: ColoredBox(color: barColor),
-                    ),
-                    Center(
-                      child: Text(
-                        '${pct.toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: pct >= 50
-                              ? Colors.white
-                              : colorScheme.onSurface,
-                        ),
+            // Progress bar — row style, % label right (26 px, matches main app)
+            SizedBox(
+              height: 26,
+              child: Row(
+                children: [
+                  Flexible(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ColoredBox(color: barColor.withValues(alpha: 0.15)),
+                          FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: (pct / 100).clamp(0.0, 1.0),
+                            child: ColoredBox(color: barColor),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${pct.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: barColor,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 4),

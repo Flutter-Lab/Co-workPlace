@@ -17,7 +17,7 @@ Main
 │       ├── Goal card (tap → detail, edit button on card)
 │       │   ├── Title + state pill (On Track / Needs Pace / Completed)
 │       │   ├── Progress summary  (completed / target unit)
-│       │   ├── Progress bar (tall 26px, rounded, % label right, color by progress)
+│       │   ├── Progress bar (tall 26px, rounded, % right, per-goal accent color)
 │       │   ├── Action row (Add Progress · Details — both outlined / text buttons)
 │       │   └── Metric tiles — tap any tile → info bottom sheet
 │       │       ├── Done
@@ -29,8 +29,9 @@ Main
 │       │
 │       ├── Goal Details screen
 │       │   ├── Deadline warning banner (red ≤3 days / amber pace-behind 4-7 days)
+│       │   ├── Completion celebration card (sparkle animation, only when 100%)
 │       │   ├── Summary card (title, state pill, target/completed/remaining)
-│       │   ├── Progress bar (tall 26px, rounded, % label right, color by progress)
+│       │   ├── Progress bar (tall 26px, rounded, % right, per-goal accent color)
 │       │   ├── Progress heatmap (16 weeks, fit screen)
 │       │   │   ├── Week-column grid with color intensity
 │       │   │   ├── Month labels above grid
@@ -51,7 +52,7 @@ Main
     ├── Tasks section (today's tasks with completion status, read-only)
     └── Goals section (friend's active goals, read-only)
         ├── Goal card (title + state pill)
-        ├── Progress bar (tall, rounded, % label right, color by state)
+        ├── Progress bar (tall 26px, rounded, % right, color by state)
         └── Completed / Target unit summary
 
 Add little more detail in Tree and Modify Tree style like this:
@@ -60,10 +61,11 @@ Add little more detail in Tree and Modify Tree style like this:
 
 
 Current Problems and Solutions:
-  1. AppBar and Bottom Nav is taking full screen width. Also make those constrained for the mobile-style width.
-  2. 'Add progress' button lookes wired and big in Simple Goal. Make it nicer and little bit smaller.
-  3. Test everything you updated in code and comfirm updates are working properly.
-  4. Suggest next improvements.
+  1. Implement 'Friend goal read-only view' properly
+  2. Make Goal Progress bar in random color. But keep the color vibe properly.
+  3. Implement Confetti or completion animation — Celebrate when a goal hits 100%.
+  4. Test everything you updated in code and comfirm updates are working properly.
+  5. Suggest next improvements.
   
 Prompt:
   You are an expert Flutter developer. Now plan the implementation for updates in
