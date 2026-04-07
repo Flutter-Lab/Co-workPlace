@@ -1,7 +1,8 @@
 Overall App Flow (Easy Flow)
 ========================
 
-Entire App 
+Entire App  (max-width 600px on web · 420px native)
+├── Global overlays: PointsAnimationWidget (floating ⭐ badge on earn)
 ├── Settings (SettingsScreen) — gear icon in Tab 0 AppBar
 │   ├── Profile Settings (display name · timezone)
 │   ├── Daily Reminder (notification toggle)
@@ -20,7 +21,7 @@ Entire App
 │               ├── TaskCompletionBar
 │               ├── ⭐ pts badge · 🔥 streak badge (self only)
 │               └── expand → task list with status icons
-├── Tab 1 · Goals (GoalDashboardScreen)
+├── Tab 1 · Goals (GoalDashboardScreen)  ← +1 pt on create/update (once/hr · animation)
 ├── Tab 2 · Friends (FriendsScreen)  ← badge clears on visit
 │   ├── Friends list with presence avatars
 │   ├── FAB → "Add Friend" bottom sheet (username search)
@@ -29,22 +30,24 @@ Entire App
     ├── _ProfileHeader (avatar · name · streak badge)
     ├── Current Mode card
     ├── Account Security card
-    ├── ★ Points card  (all-time pts · "+2 pts / 2 hrs" hint)
+    ├── ★ Points card  (all-time pts · "+2 pts / 2 hrs" hint · tap → PointsLogScreen)
+    │   └── PointsLogScreen  →  all period scores (alltime · monthly · weekly)
+    │       └── ℹ info button  →  PointsInfoScreen (how to earn pts table)
     ├── Filter chips + Reset Today
     ├── _TodayStatsRow (done · skipped · pending chips)
-    └── Task list (daily / one-time · check / skip actions)
+    └── Task list (daily / one-time · check / skip actions · +3 pts animation on done)
 
 
 -----Don't Update anything bellow this line------
 
 
 Current Problems and Solutions:
-  1. Implement Dark mode — (ThemeMode.system is already possible with the current Material3 setup; just exposing the toggle in settings.)
-  2. Give me suggestions for Adding Task from Goal with Easy and Smooth user Experience.
-  3. Share Goal option is only Copying a Text now. Plan on How to share entire Goal with a Link. And Anybody can see the Goal with that link.
-  4. Implement Multiple Kinds of colors in Entire app like Goal Dashboard to make the Entire app colorful. Keep the Vibe. Do it properly and nicely
-  5. Suggest Some More App Names.
-  6. Add 2 point for Every two hour user open app. and Add another flow file for Pointing system like this file. Add a point card in Profile screen in proper place. Show points in Feed screen within friend's card. I will add more point logics for users. Give me suggestions also for this
+  1. Point Log Screen will show Points add time and reason (transaction style). And every update show the Total points.
+  2. Completing task Adding point but Undone/Undo complete is not subtracting points. Fix this.
+  3. Point value is not updating instantly in Point card when I see the animation of point add.
+  4. 
+  5. 
+  6. 
   7. Test everything you updated in code and comfirm updates are working properly.
   8. Suggest next improvements and refining ideas.
 

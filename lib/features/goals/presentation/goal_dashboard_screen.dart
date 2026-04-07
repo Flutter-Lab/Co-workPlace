@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/core/providers/points_animation_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:coworkplace/features/goals/domain/goal.dart';
 import 'package:coworkplace/features/goals/domain/goal_item.dart';
 import 'package:coworkplace/features/goals/domain/goal_metrics.dart';
 import 'package:coworkplace/features/goals/providers/goal_providers.dart';
+import 'package:coworkplace/features/leaderboard/data/score_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -210,6 +212,13 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
             deadlineUtc: draft.deadlineUtc,
             isSimpleGoal: draft.isSimpleGoal,
           );
+      // Award 1 pt for creating a goal, once per hour
+      try {
+        await ScoreService().awardGoalUpdate(userId: userId);
+        if (context.mounted) {
+          ref.read(pointsAnimationProvider.notifier).show('+1 pt');
+        }
+      } catch (_) {}
     } catch (e) {
       if (!context.mounted) {
         return;
@@ -246,6 +255,13 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
       await ref
           .read(goalRepositoryProvider)
           .updateGoal(goal: updated, actorUserId: userId);
+      // Award 1 pt for updating a goal, once per hour
+      try {
+        await ScoreService().awardGoalUpdate(userId: userId);
+        if (context.mounted) {
+          ref.read(pointsAnimationProvider.notifier).show('+1 pt');
+        }
+      } catch (_) {}
     } catch (e) {
       if (!context.mounted) {
         return;

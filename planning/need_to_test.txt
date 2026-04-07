@@ -1,0 +1,3 @@
+Share Goal option is only Copying a Text now. Plan on How to share entire Goal with a Link. And Anybody can see the Goal with that link.
+Show a Nice animation when User gets points.
+Add 1 Point When User Update/Create Goal (Once in a hour)

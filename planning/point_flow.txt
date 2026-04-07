@@ -1,0 +1,51 @@
+Points System Flow
+==================
+
+Storage
+├── Firestore: users/{userId}/scores/{periodId}
+│   └── { periodId, points, updatedAtUtc }
+├── Period IDs: week_YYYY_WNN · month_YYYY_MM · alltime
+└── Idempotency: dedup marker doc written in same transaction
+
+Current Point Rules
+├── App open (per 2-hr window)    +2 pts  →  users/{id}/appOpenSlots/{YYYY-MM-DD-openN}
+├── Activity hour                 +1 pt   →  users/{id}/activityHours/{YYYY-MM-DD-HH}
+├── Create / update a task        +2 pts  →  fires once at creation (no dedup)
+├── Create / update a goal        +1 pt   →  users/{id}/goalUpdateSlots/{YYYY-MM-DD-HH}  (once/hr)
+├── Complete a task               +3 pts  →  controlled by completion doc
+└── Receive a vote on task        +1 pt   →  tasks/{owner}/tasks/{task}/votes/{liker}
+
+ScoreService Methods  (score_service.dart)
+├── awardAppOpen(userId)          +2 pts  idempotent per 2-hr slot
+├── awardActivityHour(userId)     +1 pt   idempotent per hour
+├── awardTaskCreate(ownerId)      +2 pts  (default)
+├── awardGoalUpdate(userId)       +1 pt   idempotent per hour
+├── awardCompletion(userId)       +3 pts  (default)
+├── awardVote(ownerId, taskId, likerId)   +1 pt  idempotent per liker per task
+├── revokeVote(ownerId, taskId, likerId) −1 pt
+├── getPointsForUser(userId)      → all-time points (int)
+├── watchAllScores(userId)        → Stream of all score period docs
+├── getScoresForUsers(periodId, userIds)  leaderboard batch fetch
+└── streamTopScores(periodId)     real-time leaderboard stream
+
+Where Points Are Shown
+├── Profile screen   →  _PointsCard (all-time pts · tap → PointsLogScreen)
+├── Home feed        →  _FriendFeedTile (⭐ pts badge)
+├── Leaderboard      →  weekly ranked list
+└── On earn         →  floating "+N pts ⭐" animation overlay (PointsAnimationWidget)
+
+Points Log Screen  (points_log_screen.dart)
+├── List of all score period docs (alltime · monthly · weekly)
+├── Sorted: alltime first, then monthly desc, then weekly desc
+└── Info button  →  PointsInfoScreen
+
+Points Info Screen  (points_info_screen.dart)
+└── Table of all earning rules (action · pts · dedup)
+
+Suggested Future Rules
+├── Perfect day (all daily tasks done)    +5 pts   bonus on perfect day
+├── 7-day consecutive streak              +20 pts  weekly consistency
+├── Friend accepts request                +3 pts   social growth
+├── First task before noon                +1 pt    early-bird bonus
+├── Vote on 3+ friends in one day         +2 pts   engagement bonus
+└── Set a current mode (daily)            +1 pt    daily check-in

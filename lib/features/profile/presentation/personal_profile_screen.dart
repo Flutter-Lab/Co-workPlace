@@ -5,12 +5,14 @@ import 'package:coworkplace/features/mode/domain/default_mode_presets.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/features/leaderboard/data/score_service.dart';
+import 'package:coworkplace/features/profile/presentation/points_log_screen.dart';
 import 'package:coworkplace/features/profile/presentation/task_history_screen.dart';
 import 'package:coworkplace/features/settings/presentation/settings_screen.dart';
 import 'package:coworkplace/features/tasks/domain/task.dart';
 import 'package:coworkplace/features/tasks/domain/task_completion.dart';
 import 'package:coworkplace/features/tasks/providers/task_providers.dart';
 import 'package:coworkplace/core/widgets/user_avatar.dart';
+import 'package:coworkplace/core/providers/points_animation_provider.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -462,6 +464,9 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
           (previous == null || previous.status != CompletionStatus.done)) {
         try {
           await ScoreService().awardCompletion(userId: userId);
+          if (mounted) {
+            ref.read(pointsAnimationProvider.notifier).show('+3 pts');
+          }
         } catch (_) {
           // Non-fatal: scoring is best-effort from client. Do not block UI on failure.
         }
@@ -1513,75 +1518,93 @@ class _PointsCardState extends State<_PointsCard> {
       builder: (context, snap) {
         final points = snap.data ?? 0;
         return Card(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.star_rounded,
-                    color: Color(0xFFF59E0B),
-                    size: 22,
-                  ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => PointsLogScreen(userId: widget.userId),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'All-time Points',
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withAlpha(160),
-                            ),
-                      ),
-                      const SizedBox(height: 2),
-                      snap.connectionState == ConnectionState.waiting
-                          ? const SizedBox(
-                              height: 16,
-                              width: 60,
-                              child: LinearProgressIndicator(),
-                            )
-                          : Text(
-                              '$points pts',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF92400E),
-                                  ),
-                            ),
-                    ],
-                  ),
-                ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      '+2 pts / 2 hrs',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: const Color(0xFF92400E),
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: const Icon(
+                      Icons.star_rounded,
+                      color: Color(0xFFF59E0B),
+                      size: 22,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'All-time Points',
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withAlpha(160),
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        snap.connectionState == ConnectionState.waiting
+                            ? const SizedBox(
+                                height: 16,
+                                width: 60,
+                                child: LinearProgressIndicator(),
+                              )
+                            : Text(
+                                '$points pts',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF92400E),
+                                    ),
+                              ),
+                      ],
+                    ),
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      child: Text(
+                        '+2 pts / 2 hrs',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: const Color(0xFF92400E),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(100),
+                  ),
+                ],
+              ),
             ),
           ),
         );

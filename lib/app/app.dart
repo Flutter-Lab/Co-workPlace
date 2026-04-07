@@ -11,7 +11,9 @@ import 'package:coworkplace/features/auth/presentation/auth_entry_screen.dart';
 import 'package:coworkplace/features/home/presentation/home_shell_screen.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/core/widgets/vote_ticker.dart';
+import 'package:coworkplace/core/widgets/points_animation_widget.dart';
 import 'package:coworkplace/features/profile/presentation/profile_setup_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -75,8 +77,7 @@ class _SessionGate extends ConsumerWidget {
           return const SizedBox.shrink();
         }
 
-        // Place the global VoteTicker above all screens so vote announcements
-        // appear regardless of current route.
+        // Place the global VoteTicker and points animation above all screens.
         final stacked = Stack(
           children: [
             child,
@@ -87,12 +88,13 @@ class _SessionGate extends ConsumerWidget {
                 right: 12,
                 child: SafeArea(child: VoteTicker()),
               ),
+            const Positioned.fill(child: PointsAnimationWidget()),
           ],
         );
 
         return Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: BoxConstraints(maxWidth: kIsWeb ? 600 : 420),
             child: ClipRect(
               child: _BootstrapWarningOverlay(
                 state: bootstrapState,

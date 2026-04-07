@@ -367,6 +367,73 @@ class ScoreService {
     });
   }
 
+  // Award 1 point when user creates or updates a goal, once per hour (idempotent).
+  Future<void> awardGoalUpdate({
+    required String userId,
+    DateTime? atUtc,
+  }) async {
+    final now = (atUtc ?? DateTime.now()).toUtc();
+    final hourKey =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}-${now.hour.toString().padLeft(2, '0')}';
+    final markerRef = _firestore.doc('users/$userId/goalUpdateSlots/$hourKey');
+
+    final weekId = weekPeriodId(now);
+    final monthId = monthPeriodId(now);
+    final allId = alltimePeriodId();
+
+    try {
+      await _firestore.runTransaction((tx) async {
+        final markerSnap = await tx.get(markerRef);
+        if (markerSnap.exists) return; // already awarded this hour
+
+        tx.set(markerRef, {'createdAt': FieldValue.serverTimestamp()});
+
+        final weekRef = _firestore.doc('users/$userId/scores/$weekId');
+        final monthRef = _firestore.doc('users/$userId/scores/$monthId');
+        final allRef = _firestore.doc('users/$userId/scores/$allId');
+
+        for (final entry in [
+          (weekRef, weekId),
+          (monthRef, monthId),
+          (allRef, allId),
+        ]) {
+          tx.set(entry.$1, {
+            'periodId': entry.$2,
+            'points': FieldValue.increment(1),
+            'updatedAtUtc': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      });
+    } catch (e, st) {
+      debugPrint('awardGoalUpdate failed: $e\n$st');
+      rethrow;
+    }
+  }
+
+  // Stream all score period docs for a user, sorted with alltime first then by date desc.
+  Stream<List<Map<String, dynamic>>> watchAllScores(String userId) {
+    return _firestore.collection('users/$userId/scores').snapshots().map((
+      snap,
+    ) {
+      final docs = snap.docs.map((d) {
+        final data = d.data();
+        return {
+          'periodId': d.id,
+          'points': (data['points'] ?? 0) as int,
+          'updatedAtUtc': data['updatedAtUtc'],
+        };
+      }).toList();
+      docs.sort((a, b) {
+        final aId = a['periodId'] as String;
+        final bId = b['periodId'] as String;
+        if (aId == 'alltime') return -1;
+        if (bId == 'alltime') return 1;
+        return bId.compareTo(aId); // lexicographic desc → newest first
+      });
+      return docs;
+    });
+  }
+
   // Query top N leaderboard entries for a period (collectionGroup on scores)
   Stream<List<Map<String, dynamic>>> streamTopScores({
     required String periodId,
