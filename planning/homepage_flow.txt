@@ -4,32 +4,37 @@ Homepage Flow (Easy Flow)
 HomeShellScreen (BottomNavigationBar — 4 tabs)
 ├── Tab 0 · Home (HomeScreen)
 │   ├── AppBar → "Coworkplace"
-│   ├── ListView
-│   │   ├── _LeaderboardCard
-│   │   │   └── Weekly Top: avatar · name · pts  →  tap → LeaderboardScreen
-│   │   ├── _FriendFeedSection — "Today" card
-│   │   │   ├── _FriendFeedTile (self — "My Tasks")
-│   │   │   │   ├── Header  [InkWell → PersonalProfileScreen]
-│   │   │   │   │   ├── UserAvatar + Online dot
-│   │   │   │   │   ├── "My Tasks" title / mode label
-│   │   │   │   │   └── Expand chevron (toggle)
-│   │   │   │   ├── Summary: "done/total · first task"
-│   │   │   │   ├── TaskCompletionBar (styled, per-user color)
-│   │   │   │   ├── Day start time
-│   │   │   │   └── [Expanded] task list · "My Profile" button
-│   │   │   └── _FriendFeedTile (friend × N)
-│   │   │       ├── Header  [InkWell → FriendProfileScreen]
-│   │   │       │   ├── UserAvatar + Online dot
-│   │   │       │   ├── display name / mode label
-│   │   │       │   └── Expand chevron (toggle)
-│   │   │       ├── Summary: "done/total · first task"
-│   │   │       ├── TaskCompletionBar (styled, per-user color)
-│   │   │       ├── Day start time (in viewer's timezone)
-│   │   │       └── [Expanded] presence label · task list · "Show Full Profile"
-│   │   └── _ArchivedGoalsSection (Goals tab passthrough)
-│   └── Version badge overlay (bottom-right)
+│   ├── RefreshIndicator (pull-to-refresh)
+│   └── ListView
+│       ├── _LeaderboardCard
+│       │   └── Weekly Top: avatar · name · pts  →  tap → LeaderboardScreen
+│       ├── _FriendFeedSection — "Today" card
+│       │   ├── Header row: "Today" label + grid/list toggle icon
+│       │   ├── _FriendFeedTile (self — "My Tasks")  [list mode only]
+│       │   │   ├── Header  [InkWell → PersonalProfileScreen]
+│       │   │   │   ├── UserAvatar + Online/Idle/Offline dot
+│       │   │   │   ├── "My Tasks" title / mode label
+│       │   │   │   └── Expand chevron (toggle)
+│       │   │   ├── Summary: "done/total · first task"
+│       │   │   ├── TaskCompletionBar (tap → GoalDashboardScreen)
+│       │   │   ├── Day start time
+│   │   │   │   └── [Expanded] task list (scrollable, max 240px, long-press → mark done/undo) · "My Profile" link
+│   │   │   └── _FriendFeedTile (friend × N, sorted online→idle→offline)
+│       │       ├── List mode
+│       │       │   ├── Header  [InkWell → FriendProfileScreen]
+│       │       │   │   ├── UserAvatar + Online/Idle/Offline dot
+│       │       │   │   ├── display name / mode label
+│       │       │   │   └── Expand chevron (toggle)
+│       │       │   ├── Summary: "done/total · first task"
+│       │       │   ├── TaskCompletionBar (tap → expand, per-user color)
+│       │       │   ├── Day start time (in viewer's timezone)
+│       │       │   └── [Expanded] presence label · task list · "Full Profile" link
+│       │       └── Grid mode (compact — tap header → FriendProfileScreen)
+│       │           ├── UserAvatar + dot + name/mode (ellipsis overflow)
+│       │           └── TaskCompletionBar (no label, per-user color, 120px cell)
+│       └── Version badge overlay (bottom-right)
 ├── Tab 1 · Goals (GoalDashboardScreen)
-├── Tab 2 · Friends (FriendsScreen)
+├── Tab 2 · Friends (FriendsScreen)  ← badge clears on visit
 └── Tab 3 · Profile (PersonalProfileScreen)
 
 
@@ -37,15 +42,11 @@ HomeShellScreen (BottomNavigationBar — 4 tabs)
 
 
 Current Problems and Solutions:
-  1. Implement Pull-to-refresh — Wrap the ListView in a RefreshIndicator to manually re-fetch friend data.
-  2. Implement Friend activity badge — Show a dot/chip on the Friends tab icon if any friend completed tasks since last visit (using updatedAtUtc comparison in a Riverpod provider).
-  3. Implement Compact/grid toggle — Re-enable the existing FeedViewMode.grid (already coded, just disabled) with a toggle button in the AppBar.
-  4. Implement Pull-to-refresh — Wrap the ListView in a RefreshIndicator to manually re-fetch friend data.
-  5. Implement Tap on progress bar → open goal view or task list directly (shortcut navigation).
-  6. Make Expanded List scrollable and fit with a limited height properly to handle too long list.
-  7. Show User status idle/offline if user didn't interect withing app in last 10 minutes even if app open currently.
-  8. Test everything you updated in code and comfirm updates are working properly.
-  9. Suggest next improvements and refining ideas.
+  1. Show Completion percentage inside progressbar in Gridview mode only.
+  2. Delete Custom day start option. Day will start at 12:00 am (local time) and reset daily tasks. And show remaining time info of the day in friend's card instead of Day start time info.
+  3. Suggest some new features and UI improvements. Review entire app And Plan production publish. (Currenty iOS app publish)
+  4. Test everything you updated in code and comfirm updates are working properly.
+  5. Suggest next improvements and refining ideas.
   
 Prompt:
   You are an expert Flutter developer. Now plan the implementation for updates in

@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:coworkplace/app/theme/app_theme.dart';
+import 'package:coworkplace/app/theme/theme_mode_provider.dart';
 import 'package:coworkplace/core/app_constants.dart';
+import 'package:coworkplace/features/leaderboard/data/score_service.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_provider.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_state.dart';
 import 'package:coworkplace/features/auth/presentation/auth_entry_screen.dart';
@@ -41,10 +43,14 @@ class _SessionGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(appSessionProvider);
 
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'Coworkplace',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
       home: session.when(
         loading: () => const _SplashScreen(),
         error: (error, stackTrace) =>
@@ -185,6 +191,7 @@ class _PresenceHeartbeatState extends ConsumerState<_PresenceHeartbeat>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _setOnlineAndHeartbeat();
+    _tryAwardAppOpen();
     _timer = Timer.periodic(_heartbeatInterval, (_) {
       _setOnlineAndHeartbeat();
     });
@@ -203,6 +210,7 @@ class _PresenceHeartbeatState extends ConsumerState<_PresenceHeartbeat>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _setOnlineAndHeartbeat(force: true);
+      _tryAwardAppOpen();
       return;
     }
 
@@ -229,6 +237,14 @@ class _PresenceHeartbeatState extends ConsumerState<_PresenceHeartbeat>
           .setPresence(userId: widget.userId, isOnline: true, seenAtUtc: now);
     } catch (_) {
       // Presence should not crash the UI.
+    }
+  }
+
+  void _tryAwardAppOpen() {
+    try {
+      ScoreService().awardAppOpen(userId: widget.userId).catchError((_) {});
+    } catch (_) {
+      // Firebase not ready (e.g. tests) — skip silently.
     }
   }
 

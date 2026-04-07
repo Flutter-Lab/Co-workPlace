@@ -1,1 +1,0 @@
-Evaluate my planned updates, propose better alternatives if needed, and outline a clear implementation plan before coding.

@@ -83,7 +83,7 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
         ],
       ),
       body: sessionAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const _ProfileSkeleton(),
         error: (error, stackTrace) =>
             Center(child: Text('Session error: $error')),
         data: (session) {
@@ -120,7 +120,7 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
               }
 
               if (!taskSnapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
+                return const _ProfileSkeleton();
               }
 
               final data = taskSnapshot.data ?? [];
@@ -164,7 +164,10 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                         const SizedBox(height: 12),
                         Card(
                           child: ListTile(
-                            leading: const Icon(Icons.mood_outlined),
+                            leading: const Icon(
+                              Icons.mood_outlined,
+                              color: Color(0xFF8B5CF6),
+                            ),
                             title: const Text('Current Mode'),
                             subtitle: Text(
                               profile.currentMode?.label ?? 'Not set',
@@ -182,6 +185,8 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                           isAnonymous: authUser?.isAnonymous ?? true,
                           onUpgradeRequested: _showUpgradeAccountDialog,
                         ),
+                        const SizedBox(height: 12),
+                        _PointsCard(userId: userId),
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
@@ -214,7 +219,19 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
+                        _TodayStatsRow(
+                          doneCount: completions
+                              .where((c) => c.status == CompletionStatus.done)
+                              .length,
+                          skippedCount: completions
+                              .where(
+                                (c) => c.status == CompletionStatus.skipped,
+                              )
+                              .length,
+                          totalCount: myTasks.length,
+                        ),
+                        const SizedBox(height: 4),
                         if (visibleTasks.isEmpty)
                           const Card(
                             child: ListTile(
@@ -246,8 +263,11 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
                                     color:
                                         completion?.status ==
                                             CompletionStatus.done
-                                        ? Theme.of(context).colorScheme.primary
-                                        : null,
+                                        ? const Color(0xFF22C55E)
+                                        : completion?.status ==
+                                              CompletionStatus.skipped
+                                        ? const Color(0xFFF59E0B)
+                                        : const Color(0xFFCBD5E1),
                                   ),
                                   onPressed: () {
                                     if (completion?.status ==
@@ -1357,53 +1377,92 @@ class _ProfileHeaderState extends ConsumerState<_ProfileHeader> {
   @override
   Widget build(BuildContext context) {
     final profile = widget.profile;
-    return Row(
-      children: [
-        Stack(
-          alignment: Alignment.center,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
           children: [
-            InkWell(
-              onTap: () => _pickAndUploadPhoto(context, ref),
-              borderRadius: BorderRadius.circular(36),
-              child: UserAvatar(profile: profile, radius: 36),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                InkWell(
+                  onTap: () => _pickAndUploadPhoto(context, ref),
+                  borderRadius: BorderRadius.circular(36),
+                  child: UserAvatar(profile: profile, radius: 36),
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.camera_alt,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.camera_alt,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    profile.displayName,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  Text(
+                    '@${profile.username}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _StreakBadge(userId: profile.id),
+                ],
               ),
             ),
           ],
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                profile.displayName,
-                style: Theme.of(context).textTheme.titleLarge,
+      ),
+    );
+  }
+}
+
+class _StreakBadge extends ConsumerWidget {
+  const _StreakBadge({required this.userId});
+
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streakAsync = ref.watch(streakProvider(userId));
+    return streakAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (e, s) => const SizedBox.shrink(),
+      data: (streak) {
+        if (streak == 0) return const SizedBox.shrink();
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🔥', style: TextStyle(fontSize: 14)),
+            const SizedBox(width: 4),
+            Text(
+              '$streak-day streak',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: const Color(0xFFF97316),
+                fontWeight: FontWeight.w700,
               ),
-              Text(
-                '@${profile.username}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1426,4 +1485,308 @@ class _TaskDraft {
   final DateTime? scheduledTimeUtc;
   final double? goalCount;
   final String? goalUnit;
+}
+
+// ─── Points Card ─────────────────────────────────────────────────────────────
+
+class _PointsCard extends StatefulWidget {
+  const _PointsCard({required this.userId});
+  final String userId;
+
+  @override
+  State<_PointsCard> createState() => _PointsCardState();
+}
+
+class _PointsCardState extends State<_PointsCard> {
+  late final Future<int> _pointsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _pointsFuture = ScoreService().getPointsForUser(widget.userId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<int>(
+      future: _pointsFuture,
+      builder: (context, snap) {
+        final points = snap.data ?? 0;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    color: Color(0xFFF59E0B),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'All-time Points',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withAlpha(160),
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      snap.connectionState == ConnectionState.waiting
+                          ? const SizedBox(
+                              height: 16,
+                              width: 60,
+                              child: LinearProgressIndicator(),
+                            )
+                          : Text(
+                              '$points pts',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF92400E),
+                                  ),
+                            ),
+                    ],
+                  ),
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      '+2 pts / 2 hrs',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: const Color(0xFF92400E),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── Today Stats Row ─────────────────────────────────────────────────────────
+
+class _TodayStatsRow extends StatelessWidget {
+  const _TodayStatsRow({
+    required this.doneCount,
+    required this.skippedCount,
+    required this.totalCount,
+  });
+  final int doneCount;
+  final int skippedCount;
+  final int totalCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final pendingCount = totalCount - doneCount - skippedCount;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        _StatChip(
+          label: '$doneCount done',
+          color: const Color(0xFF166534),
+          bg: const Color(0xFFDCFCE7),
+        ),
+        if (skippedCount > 0)
+          _StatChip(
+            label: '$skippedCount skipped',
+            color: const Color(0xFF92400E),
+            bg: const Color(0xFFFEF3C7),
+          ),
+        if (pendingCount > 0)
+          _StatChip(
+            label: '$pendingCount pending',
+            color: const Color(0xFF1E3A8A),
+            bg: const Color(0xFFDBEAFE),
+          ),
+      ],
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({required this.label, required this.color, required this.bg});
+  final String label;
+  final Color color;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Profile Loading Skeleton ────────────────────────────────────────────────
+
+class _ProfileSkeleton extends StatefulWidget {
+  const _ProfileSkeleton();
+
+  @override
+  State<_ProfileSkeleton> createState() => _ProfileSkeletonState();
+}
+
+class _ProfileSkeletonState extends State<_ProfileSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Widget _block(Color c, {double? w, double h = 13, double r = 6}) => Container(
+    width: w,
+    height: h,
+    decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(r)),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final base = Theme.of(context).colorScheme.onSurface.withAlpha(18);
+    final hi = Theme.of(context).colorScheme.onSurface.withAlpha(40);
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final c = Color.lerp(base, hi, _ctrl.value)!;
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Header skeleton
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _block(c, w: 140, h: 16),
+                          const SizedBox(height: 8),
+                          _block(c, w: 90),
+                          const SizedBox(height: 6),
+                          _block(c, w: 100, h: 11),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _block(c, w: 80, h: 12),
+                    const SizedBox(height: 8),
+                    _block(c, h: 10),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (var i = 0; i < 3; i++) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: c,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _block(c, h: 12),
+                            const SizedBox(height: 6),
+                            _block(c, w: double.infinity * 0.6, h: 10),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
+        );
+      },
+    );
+  }
 }

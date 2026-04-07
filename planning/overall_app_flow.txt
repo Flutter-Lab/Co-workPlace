@@ -1,0 +1,59 @@
+Overall App Flow (Easy Flow)
+========================
+
+Entire App 
+├── Settings (SettingsScreen) — gear icon in Tab 0 AppBar
+│   ├── Profile Settings (display name · timezone)
+│   ├── Daily Reminder (notification toggle)
+│   ├── Theme  ── System / Light / Dark  (persisted in Hive)
+│   ├── Current Mode Presets
+│   └── Logout
+├── Tab 0 · Home (HomeScreen)
+│   ├── AppBar → "Coworkplace"
+│   ├── RefreshIndicator (pull-to-refresh)
+│   └── ListView
+│       ├── _LeaderboardCard
+│       │   └── Weekly Top: avatar · name · pts badge  →  tap → LeaderboardScreen
+│       └── _FriendFeedSection
+│           └── _FriendFeedTile (per user)
+│               ├── avatar · name · mode label
+│               ├── TaskCompletionBar
+│               ├── ⭐ pts badge · 🔥 streak badge (self only)
+│               └── expand → task list with status icons
+├── Tab 1 · Goals (GoalDashboardScreen)
+├── Tab 2 · Friends (FriendsScreen)  ← badge clears on visit
+│   ├── Friends list with presence avatars
+│   ├── FAB → "Add Friend" bottom sheet (username search)
+│   └── Inbox icon → Requests bottom sheet (incoming / outgoing)
+└── Tab 3 · Profile (PersonalProfileScreen)
+    ├── _ProfileHeader (avatar · name · streak badge)
+    ├── Current Mode card
+    ├── Account Security card
+    ├── ★ Points card  (all-time pts · "+2 pts / 2 hrs" hint)
+    ├── Filter chips + Reset Today
+    ├── _TodayStatsRow (done · skipped · pending chips)
+    └── Task list (daily / one-time · check / skip actions)
+
+
+-----Don't Update anything bellow this line------
+
+
+Current Problems and Solutions:
+  1. Implement Dark mode — (ThemeMode.system is already possible with the current Material3 setup; just exposing the toggle in settings.)
+  2. Give me suggestions for Adding Task from Goal with Easy and Smooth user Experience.
+  3. Share Goal option is only Copying a Text now. Plan on How to share entire Goal with a Link. And Anybody can see the Goal with that link.
+  4. Implement Multiple Kinds of colors in Entire app like Goal Dashboard to make the Entire app colorful. Keep the Vibe. Do it properly and nicely
+  5. Suggest Some More App Names.
+  6. Add 2 point for Every two hour user open app. and Add another flow file for Pointing system like this file. Add a point card in Profile screen in proper place. Show points in Feed screen within friend's card. I will add more point logics for users. Give me suggestions also for this
+  7. Test everything you updated in code and comfirm updates are working properly.
+  8. Suggest next improvements and refining ideas.
+
+
+
+  
+Prompt:
+  You are an expert Flutter developer. Now plan the implementation for updates in
+  "Current Problems and Solutions" with minimal code change and start implementation in one pass.
+  Test all updates properly after implementation and comfirm updates are working properly..
+  Update this file's ASCII tree plan with minimal changes if need. Keep easy readability.
+  Don't include your implementation plan in this file.

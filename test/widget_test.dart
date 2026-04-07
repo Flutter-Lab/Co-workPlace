@@ -1,6 +1,7 @@
 import 'package:coworkplace/app/app.dart';
 import 'package:coworkplace/app/session/app_session.dart';
 import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/app/theme/theme_mode_provider.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_provider.dart';
 import 'package:coworkplace/core/bootstrap/bootstrap_state.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
@@ -31,6 +32,7 @@ void main() {
             ),
           ),
         ),
+        themeModeProvider.overrideWith(() => _StubThemeModeNotifier()),
       ],
       child: const CoworkplaceApp(),
     );
@@ -58,4 +60,9 @@ void main() {
     expect(find.byType(AppBar), findsOneWidget);
     expect(find.text('Goal Tracker'), findsOneWidget);
   });
+}
+
+class _StubThemeModeNotifier extends ThemeModeNotifier {
+  @override
+  ThemeMode build() => ThemeMode.system;
 }

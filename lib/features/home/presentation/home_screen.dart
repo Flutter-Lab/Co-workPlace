@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/features/goals/presentation/goal_dashboard_screen.dart';
 import 'package:coworkplace/features/leaderboard/presentation/leaderboard_screen.dart';
 import 'package:coworkplace/core/app_constants.dart';
 import 'package:coworkplace/features/leaderboard/data/score_service.dart';
-import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/features/friends/domain/friend_connection.dart';
 import 'package:coworkplace/features/friends/presentation/friend_profile_screen.dart';
 import 'package:coworkplace/features/friends/providers/friend_providers.dart';
@@ -60,23 +60,29 @@ class HomeScreen extends ConsumerWidget {
         return Scaffold(
           body: Stack(
             children: [
-              ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  const SizedBox(height: 48),
-                  const _LeaderboardCard(),
-                  const SizedBox(height: 8),
-                  _FriendFeedSection(
-                    profileRepository: profileRepository,
-                    taskRepository: taskRepository,
-                    completionRepository: completionRepository,
-                    friendStream: friendRepository.watchFriends(userId),
-                    currentUserId: userId,
-                    currentUserProfile: profile,
-                    currentFeedViewMode: profile.feedViewMode,
-                  ),
-                  const SizedBox(height: 56),
-                ],
+              RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(appSessionProvider);
+                  await Future<void>.delayed(const Duration(milliseconds: 600));
+                },
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const SizedBox(height: 48),
+                    const _LeaderboardCard(),
+                    const SizedBox(height: 8),
+                    _FriendFeedSection(
+                      profileRepository: profileRepository,
+                      taskRepository: taskRepository,
+                      completionRepository: completionRepository,
+                      friendStream: friendRepository.watchFriends(userId),
+                      currentUserId: userId,
+                      currentUserProfile: profile,
+                      currentFeedViewMode: profile.feedViewMode,
+                    ),
+                    const SizedBox(height: 56),
+                  ],
+                ),
               ),
               Positioned(
                 bottom: 12,
@@ -253,11 +259,25 @@ class _LeaderboardCardState extends ConsumerState<_LeaderboardCard> {
                     leading: UserAvatar(profile: profile, radius: 20),
                     title: const Text('👑 Weekly Top'),
                     subtitle: Text(display),
-                    trailing: Text(
-                      '$points pts',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                    trailing: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          '$points pts',
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF92400E),
+                              ),
+                        ),
                       ),
                     ),
                     onTap: () {
@@ -279,15 +299,20 @@ class _LeaderboardCardState extends ConsumerState<_LeaderboardCard> {
 }
 
 class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
-  static const _timeService = DayStartTimeService();
-  // Grid mode is temporarily disabled — force list view.
-  // To re-enable: restore `late FeedViewMode _mode = widget.currentFeedViewMode;`
-  FeedViewMode _mode = FeedViewMode.list;
+  late FeedViewMode _mode;
+
+  @override
+  void initState() {
+    super.initState();
+    _mode = widget.currentFeedViewMode;
+  }
 
   @override
   void didUpdateWidget(covariant _FriendFeedSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _mode = FeedViewMode.list;
+    if (oldWidget.currentFeedViewMode != widget.currentFeedViewMode) {
+      _mode = widget.currentFeedViewMode;
+    }
   }
 
   @override
@@ -298,7 +323,47 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Today', style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                const Icon(
+                  Icons.wb_sunny_outlined,
+                  size: 18,
+                  color: Color(0xFFF59E0B),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Today',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: Icon(
+                    _mode == FeedViewMode.grid
+                        ? Icons.view_list_outlined
+                        : Icons.grid_view_outlined,
+                  ),
+                  tooltip: _mode == FeedViewMode.grid
+                      ? 'List view'
+                      : 'Grid view',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  onPressed: () {
+                    final next = _mode == FeedViewMode.grid
+                        ? FeedViewMode.list
+                        : FeedViewMode.grid;
+                    setState(() => _mode = next);
+                    _persistMode(next);
+                  },
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             _FriendFeedTile(
               profile: widget.currentUserProfile,
@@ -347,7 +412,11 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
                       return const _FeedSkeletonCard();
                     }
 
-                    final profiles = profileSnapshot.data!;
+                    final profiles = [...profileSnapshot.data!]
+                      ..sort(
+                        (a, b) =>
+                            _presenceSortKey(a).compareTo(_presenceSortKey(b)),
+                      );
                     if (_mode == FeedViewMode.grid) {
                       return GridView.builder(
                         shrinkWrap: true,
@@ -358,7 +427,7 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
                               crossAxisCount: 2,
                               mainAxisSpacing: 8,
                               crossAxisSpacing: 8,
-                              childAspectRatio: 1.35,
+                              mainAxisExtent: 120,
                             ),
                         itemBuilder: (context, index) {
                           return _FriendFeedTile(
@@ -397,8 +466,6 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
     );
   }
 
-  // Kept for future re-enable of grid-mode persistence.
-  // ignore: unused_element
   Future<void> _persistMode(FeedViewMode nextMode) async {
     final session = ref.read(appSessionProvider).valueOrNull;
     final profile = session?.profile;
@@ -418,18 +485,16 @@ class _FriendFeedSectionState extends ConsumerState<_FriendFeedSection> {
 
   String _resolveLocalDateKey(UserProfile profile) {
     try {
-      return _timeService.localDateKeyForUtcInstant(
-        instantUtc: DateTime.now().toUtc(),
-        timezone: profile.timezone,
-        dayStartHour: profile.dayStartHour,
-      );
+      final location = tz.getLocation(profile.timezone);
+      final localNow = tz.TZDateTime.now(location);
+      return DateFormat('yyyy-MM-dd').format(localNow);
     } catch (_) {
-      return DateFormat('yyyy-MM-dd').format(DateTime.now().toUtc());
+      return DateFormat('yyyy-MM-dd').format(DateTime.now());
     }
   }
 }
 
-class _FriendFeedTile extends StatefulWidget {
+class _FriendFeedTile extends ConsumerStatefulWidget {
   const _FriendFeedTile({
     required this.profile,
     required this.taskRepository,
@@ -449,11 +514,18 @@ class _FriendFeedTile extends StatefulWidget {
   final String viewerTimezone;
 
   @override
-  State<_FriendFeedTile> createState() => _FriendFeedTileState();
+  ConsumerState<_FriendFeedTile> createState() => _FriendFeedTileState();
 }
 
-class _FriendFeedTileState extends State<_FriendFeedTile> {
+class _FriendFeedTileState extends ConsumerState<_FriendFeedTile> {
   bool _expanded = false;
+  Future<int>? _pointsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _pointsFuture = ScoreService().getPointsForUser(widget.profile.id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -496,6 +568,7 @@ class _FriendFeedTileState extends State<_FriendFeedTile> {
               totalCount: totalCount,
               activeTasks: activeTasks,
               completionByTaskId: completionByTaskId,
+              localDateKey: localDateKey,
             );
           },
         );
@@ -510,14 +583,17 @@ class _FriendFeedTileState extends State<_FriendFeedTile> {
     required int totalCount,
     required List<Task> activeTasks,
     required Map<String, TaskCompletion> completionByTaskId,
+    required String localDateKey,
   }) {
     final profile = widget.profile;
     final modeLabel = profile.currentMode?.label ?? 'No mode';
     final isOnline = _isOnline(profile);
+    final isIdle = !isOnline && _isIdle(profile);
     final cardTitle = widget.isSelf ? 'My Tasks' : profile.displayName;
     final percent = totalCount == 0
         ? 0.0
         : (doneCount / totalCount).clamp(0.0, 1.0);
+    final compact = widget.compact;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -550,6 +626,8 @@ class _FriendFeedTileState extends State<_FriendFeedTile> {
                                   decoration: BoxDecoration(
                                     color: isOnline
                                         ? Colors.green
+                                        : isIdle
+                                        ? const Color(0xFFF59E0B)
                                         : Colors.grey,
                                     shape: BoxShape.circle,
                                     border: Border.all(
@@ -564,121 +642,243 @@ class _FriendFeedTileState extends State<_FriendFeedTile> {
                             ],
                           ),
                           const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                cardTitle,
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              Text(
-                                modeLabel,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  cardTitle,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  modeLabel,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
-                AnimatedRotation(
-                  turns: _expanded ? 0.5 : 0.0,
-                  duration: const Duration(milliseconds: 200),
-                  child: IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down),
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    tooltip: _expanded ? 'Collapse' : 'Expand',
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
+                if (!compact)
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: IconButton(
+                      icon: const Icon(Icons.keyboard_arrow_down),
+                      onPressed: () => setState(() => _expanded = !_expanded),
+                      tooltip: _expanded ? 'Collapse' : 'Expand',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(summary, style: Theme.of(context).textTheme.bodySmall),
+            if (!compact) ...[
+              const SizedBox(height: 6),
+              Text(summary, style: Theme.of(context).textTheme.bodySmall),
+            ],
             const SizedBox(height: 8),
             TaskCompletionBar(
               percent: percent,
               done: doneCount,
               total: totalCount,
               colorHint: profile.id,
+              showLabel: !compact,
+              onTap: widget.isSelf && !compact
+                  ? () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const GoalDashboardScreen(),
+                      ),
+                    )
+                  : compact
+                  ? null
+                  : () => setState(() => _expanded = true),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Day start: ${_formatDayStartForViewer(widget.viewerTimezone)}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            // ── Expandable section ──────────────────────────────
-            AnimatedSize(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              child: _expanded
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Divider(height: 20),
-                        Text(
-                          widget.isSelf
-                              ? 'This is you'
-                              : _presenceLabel(profile),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: isOnline
-                                    ? Colors.green
-                                    : Theme.of(context).hintColor,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (activeTasks.isEmpty)
-                          const ListTile(
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.inbox_outlined),
-                            title: Text('No active tasks'),
-                          )
-                        else
-                          ...activeTasks.map((task) {
-                            final completion = completionByTaskId[task.id];
-                            return ListTile(
+            if (!compact) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _formatTimeRemainingInDay(widget.profile.timezone),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  _buildPointsBadge(context),
+                  if (widget.isSelf) ...[
+                    const SizedBox(width: 6),
+                    _buildStreakBadge(context),
+                  ],
+                ],
+              ),
+            ],
+            // ── Expandable section (list mode only) ─────────────
+            if (!compact)
+              AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                child: _expanded
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Divider(height: 20),
+                          Text(
+                            widget.isSelf
+                                ? 'This is you'
+                                : _presenceLabel(profile),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: isOnline
+                                      ? Colors.green
+                                      : isIdle
+                                      ? const Color(0xFFF59E0B)
+                                      : Theme.of(context).hintColor,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (activeTasks.isEmpty)
+                            const ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
-                              leading: Icon(
-                                _statusIcon(completion?.status),
-                                size: 20,
+                              leading: Icon(Icons.inbox_outlined),
+                              title: Text('No active tasks'),
+                            )
+                          else
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 240),
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  children: activeTasks.map((task) {
+                                    final completion =
+                                        completionByTaskId[task.id];
+                                    return ListTile(
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(
+                                        _statusIcon(completion?.status),
+                                        size: 20,
+                                        color:
+                                            completion?.status ==
+                                                CompletionStatus.done
+                                            ? const Color(0xFF22C55E)
+                                            : completion?.status ==
+                                                  CompletionStatus.skipped
+                                            ? const Color(0xFFF59E0B)
+                                            : Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withAlpha(80),
+                                      ),
+                                      title: Text(task.title),
+                                      subtitle: Text(
+                                        _statusLabel(completion?.status),
+                                      ),
+                                      trailing: !widget.isSelf
+                                          ? TaskVoteButton(
+                                              ownerId: profile.id,
+                                              taskId: task.id,
+                                            )
+                                          : null,
+                                      onLongPress: widget.isSelf
+                                          ? () async {
+                                              final isDone =
+                                                  completionByTaskId[task.id]
+                                                      ?.status ==
+                                                  CompletionStatus.done;
+                                              if (isDone) {
+                                                await widget
+                                                    .completionRepository
+                                                    .deleteCompletion(
+                                                      taskId: task.id,
+                                                      userId: widget.profile.id,
+                                                      localDateKey:
+                                                          localDateKey,
+                                                    );
+                                                if (!context.mounted) return;
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Marked as pending',
+                                                    ),
+                                                    duration: Duration(
+                                                      seconds: 2,
+                                                    ),
+                                                  ),
+                                                );
+                                              } else {
+                                                await widget
+                                                    .completionRepository
+                                                    .upsertCompletion(
+                                                      taskId: task.id,
+                                                      userId: widget.profile.id,
+                                                      localDateKey:
+                                                          localDateKey,
+                                                      status:
+                                                          CompletionStatus.done,
+                                                    );
+                                                try {
+                                                  await ScoreService()
+                                                      .awardCompletion(
+                                                        userId:
+                                                            widget.profile.id,
+                                                      );
+                                                } catch (_) {}
+                                                if (!context.mounted) return;
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Marked done ✓',
+                                                    ),
+                                                    duration: Duration(
+                                                      seconds: 2,
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          : null,
+                                    );
+                                  }).toList(),
+                                ),
                               ),
-                              title: Text(task.title),
-                              subtitle: Text(_statusLabel(completion?.status)),
-                              trailing: !widget.isSelf
-                                  ? TaskVoteButton(
-                                      ownerId: profile.id,
-                                      taskId: task.id,
-                                    )
-                                  : null,
-                            );
-                          }),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: FilledButton.tonalIcon(
-                            onPressed: () => _openProfile(context),
-                            icon: const Icon(Icons.person_search_outlined),
-                            label: Text(
-                              widget.isSelf
-                                  ? 'My Profile'
-                                  : 'Show Full Profile',
+                            ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: () => _openProfile(context),
+                              icon: const Icon(Icons.open_in_new, size: 14),
+                              label: Text(
+                                widget.isSelf ? 'My Profile' : 'Full Profile',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
-            ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
           ],
         ),
       ),
@@ -697,25 +897,24 @@ class _FriendFeedTileState extends State<_FriendFeedTile> {
     return 'Pending';
   }
 
-  String _formatDayStartForViewer(String viewerTimezone) {
+  String _formatTimeRemainingInDay(String timezone) {
     try {
-      final ownerLocation = tz.getLocation(widget.profile.timezone);
-      final now = tz.TZDateTime.now(ownerLocation);
-      final ownerDayStart = tz.TZDateTime(
-        ownerLocation,
+      final location = tz.getLocation(timezone);
+      final now = tz.TZDateTime.now(location);
+      final tomorrow = tz.TZDateTime(
+        location,
         now.year,
         now.month,
-        now.day,
-        widget.profile.dayStartHour,
-        0,
+        now.day + 1,
       );
-      final viewerLocation = tz.getLocation(viewerTimezone);
-      final viewerDayStart = tz.TZDateTime.from(ownerDayStart, viewerLocation);
-      return DateFormat('hh:mm a').format(viewerDayStart);
+      final remaining = tomorrow.difference(now);
+      final h = remaining.inHours;
+      final m = remaining.inMinutes.remainder(60);
+      if (h >= 1) return 'Resets in ${h}h ${m}m';
+      if (m >= 1) return 'Resets in ${m}m';
+      return 'Resetting now';
     } catch (_) {
-      return DateFormat(
-        'hh:mm a',
-      ).format(DateTime(2000, 1, 1, widget.profile.dayStartHour, 0));
+      return '';
     }
   }
 
@@ -726,8 +925,16 @@ class _FriendFeedTileState extends State<_FriendFeedTile> {
     return DateTime.now().toUtc().difference(lastSeen).inSeconds <= 70;
   }
 
+  bool _isIdle(UserProfile profile) {
+    final lastSeen = profile.lastSeenAtUtc;
+    if (lastSeen == null) return false;
+    final diff = DateTime.now().toUtc().difference(lastSeen);
+    return diff.inSeconds > 70 && diff.inMinutes < 10;
+  }
+
   String _presenceLabel(UserProfile profile) {
     if (_isOnline(profile)) return 'Online now';
+    if (_isIdle(profile)) return 'Idle';
     final lastSeen = profile.lastSeenAtUtc;
     if (lastSeen == null) return 'Offline';
     final diff = DateTime.now().toUtc().difference(lastSeen);
@@ -750,6 +957,53 @@ class _FriendFeedTileState extends State<_FriendFeedTile> {
       ),
     );
   }
+
+  Widget _buildStreakBadge(BuildContext context) {
+    final streakAsync = ref.watch(streakProvider(widget.profile.id));
+    return streakAsync.maybeWhen(
+      data: (streak) {
+        if (streak == 0) return const SizedBox.shrink();
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🔥', style: TextStyle(fontSize: 12)),
+            const SizedBox(width: 2),
+            Text(
+              '$streak\u202Fday${streak == 1 ? '' : 's'}',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: const Color(0xFFF97316),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildPointsBadge(BuildContext context) {
+    return FutureBuilder<int>(
+      future: _pointsFuture,
+      builder: (context, snap) {
+        if (!snap.hasData || snap.data == 0) return const SizedBox.shrink();
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('⭐', style: TextStyle(fontSize: 11)),
+            const SizedBox(width: 2),
+            Text(
+              '${snap.data}\u202Fpts',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: const Color(0xFFF59E0B),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class TaskCompletionBar extends StatelessWidget {
@@ -758,6 +1012,8 @@ class TaskCompletionBar extends StatelessWidget {
     required this.done,
     required this.total,
     this.colorHint,
+    this.onTap,
+    this.showLabel = true,
     super.key,
   });
 
@@ -767,6 +1023,12 @@ class TaskCompletionBar extends StatelessWidget {
 
   /// Optional string (e.g. userId) used to derive a per-user accent color.
   final String? colorHint;
+
+  /// Called when the user taps the progress bar.
+  final VoidCallback? onTap;
+
+  /// Whether to show the "X% • done/total" text label (hide in compact/grid tiles).
+  final bool showLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -779,46 +1041,79 @@ class TaskCompletionBar extends StatelessWidget {
               ? const Color(0xFF3B82F6)
               : const Color(0xFFF59E0B));
 
-    return ClipRRect(
+    return InkWell(
+      onTap: onTap,
       borderRadius: BorderRadius.circular(6),
-      child: SizedBox(
-        height: 26,
-        child: Row(
-          children: [
-            Flexible(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.0, end: clamped),
-                duration: const Duration(milliseconds: 400),
-                builder: (context, value, child) {
-                  return Stack(
-                    children: [
-                      Container(color: fillColor.withAlpha(30)),
-                      FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: value,
-                        child: Container(
-                          decoration: BoxDecoration(color: fillColor),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: SizedBox(
+          height: 26,
+          child: Row(
+            children: [
+              Expanded(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: clamped),
+                  duration: const Duration(milliseconds: 400),
+                  builder: (context, value, child) {
+                    return Stack(
+                      children: [
+                        Container(color: fillColor.withAlpha(30)),
+                        FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: value,
+                          child: Container(
+                            decoration: BoxDecoration(color: fillColor),
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                },
+                        if (!showLabel)
+                          Center(
+                            child: Text(
+                              '${(value * 100).round()}%',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: value >= 0.5 ? Colors.white : fillColor,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${(clamped * 100).round()}% \u2022 $done / $total',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: fillColor,
-              ),
-            ),
-          ],
+              if (showLabel) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '${(clamped * 100).round()}% \u2022 $done / $total',
+                  overflow: TextOverflow.clip,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: fillColor,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+int _presenceSortKey(UserProfile profile) {
+  final lastSeen = profile.lastSeenAtUtc;
+  if (profile.isOnline &&
+      lastSeen != null &&
+      DateTime.now().toUtc().difference(lastSeen).inSeconds <= 70) {
+    return 0; // online
+  }
+  if (lastSeen != null) {
+    final diff = DateTime.now().toUtc().difference(lastSeen);
+    if (diff.inSeconds > 70 && diff.inMinutes < 10) return 1; // idle
+  }
+  return 2; // offline
 }
 
 // ── Feed color palette ────────────────────────────────────────────────────────
@@ -891,27 +1186,31 @@ class _FeedSkeletonCardState extends State<_FeedSkeletonCard>
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 120,
-                          height: 13,
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            height: 13,
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          width: 80,
-                          height: 11,
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(4),
+                          const SizedBox(height: 6),
+                          FractionallySizedBox(
+                            widthFactor: 0.6,
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              height: 11,
+                              decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),

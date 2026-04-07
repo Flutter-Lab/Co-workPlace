@@ -1,5 +1,4 @@
 import 'package:coworkplace/app/session/app_session_provider.dart';
-import 'package:coworkplace/core/time/day_start_time_service.dart';
 import 'package:coworkplace/features/friends/domain/friend_connection.dart';
 import 'package:coworkplace/features/friends/presentation/friend_profile_screen.dart';
 import 'package:coworkplace/features/friends/domain/friend_request.dart';
@@ -7,9 +6,6 @@ import 'package:coworkplace/features/friends/providers/friend_providers.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:coworkplace/core/cache/user_profile_cache.dart';
-import 'package:coworkplace/features/tasks/domain/task.dart';
-import 'package:coworkplace/features/tasks/domain/task_completion.dart';
-import 'package:coworkplace/features/tasks/providers/task_providers.dart';
 import 'package:coworkplace/core/widgets/user_avatar.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +20,6 @@ class FriendsScreen extends ConsumerStatefulWidget {
 }
 
 class _FriendsScreenState extends ConsumerState<FriendsScreen> {
-  static const _timeService = DayStartTimeService();
   final _usernameController = TextEditingController();
   bool _isSendingRequest = false;
 
@@ -39,14 +34,17 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     final sessionAsync = ref.watch(appSessionProvider);
 
     return sessionAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, stackTrace) =>
-          Center(child: Text('Session error: $error')),
+          Scaffold(body: Center(child: Text('Session error: $error'))),
       data: (session) {
         final userId = session.userId;
         final profile = session.profile;
         if (userId == null || profile == null) {
-          return const Center(child: Text('Set up your profile first.'));
+          return const Scaffold(
+            body: Center(child: Text('Set up your profile first.')),
+          );
         }
 
         if (Firebase.apps.isEmpty) {
@@ -58,249 +56,340 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         return StreamBuilder<List<FriendRequest>>(
           stream: friendRepository.watchIncomingRequests(userId),
           builder: (context, incomingSnapshot) {
-            if (incomingSnapshot.hasError) {
-              return Center(
-                child: Text(
-                  'Failed to load requests: ${incomingSnapshot.error}',
-                ),
-              );
-            }
-
             return StreamBuilder<List<FriendRequest>>(
               stream: friendRepository.watchOutgoingRequests(userId),
               builder: (context, outgoingSnapshot) {
-                if (outgoingSnapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Failed to load outgoing requests: ${outgoingSnapshot.error}',
-                    ),
-                  );
-                }
-
                 return StreamBuilder<List<FriendConnection>>(
                   stream: friendRepository.watchFriends(userId),
                   builder: (context, friendsSnapshot) {
-                    if (friendsSnapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Failed to load friends: ${friendsSnapshot.error}',
-                        ),
-                      );
-                    }
-
                     final incomingRequests =
                         incomingSnapshot.data ?? const <FriendRequest>[];
                     final outgoingRequests =
                         outgoingSnapshot.data ?? const <FriendRequest>[];
                     final friends =
                         friendsSnapshot.data ?? const <FriendConnection>[];
+                    final pendingCount = incomingRequests.length;
 
-                    return ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Find friends',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Send a request using an exact username. Full search and richer discovery come next.',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                const SizedBox(height: 12),
-                                TextField(
-                                  controller: _usernameController,
-                                  textInputAction: TextInputAction.done,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Username',
-                                    hintText: 'friend_username',
-                                    border: OutlineInputBorder(),
-                                    prefixText: '@',
-                                  ),
-                                  onSubmitted: (_) =>
-                                      _sendRequest(currentUserId: userId),
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.icon(
-                                    onPressed: _isSendingRequest
-                                        ? null
-                                        : () => _sendRequest(
-                                            currentUserId: userId,
-                                          ),
-                                    icon: const Icon(Icons.person_add_alt_1),
-                                    label: Text(
-                                      _isSendingRequest
-                                          ? 'Sending...'
-                                          : 'Send Friend Request',
-                                    ),
-                                  ),
-                                ),
-                              ],
+                    return Scaffold(
+                      appBar: AppBar(
+                        title: const Text('Friends'),
+                        actions: [
+                          Badge(
+                            isLabelVisible: pendingCount > 0,
+                            label: Text('$pendingCount'),
+                            child: IconButton(
+                              tooltip: 'Friend Requests',
+                              icon: const Icon(Icons.inbox_outlined),
+                              onPressed: () => _showRequestsSheet(
+                                context,
+                                userId,
+                                incomingRequests,
+                                outgoingRequests,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        _SectionTitle(
-                          title: 'Incoming Requests',
-                          count: incomingRequests.length,
-                        ),
-                        const SizedBox(height: 8),
-                        _ProfileLookupList(
-                          ids: incomingRequests
-                              .map((request) => request.otherUserId)
-                              .toList(),
-                          emptyTitle: 'No incoming requests',
-                          emptySubtitle:
-                              'When someone adds you, the request will appear here.',
-                          itemBuilder: (otherProfile) {
-                            final request = incomingRequests.firstWhere(
-                              (item) => item.otherUserId == otherProfile.id,
-                            );
-                            return Card(
-                              child: ListTile(
-                                leading: UserAvatar(
-                                  profile: otherProfile,
-                                  radius: 20,
-                                ),
-                                title: Text(otherProfile.displayName),
-                                subtitle: Text(
-                                  '@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}',
-                                ),
-                                isThreeLine: false,
-                                trailing: Wrap(
-                                  spacing: 8,
-                                  children: [
-                                    IconButton(
-                                      tooltip: 'Accept',
-                                      onPressed: () => _acceptRequest(
-                                        userId: userId,
-                                        fromUserId: otherProfile.id,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.check_circle_outline,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Reject',
-                                      onPressed: () => _rejectRequest(
-                                        userId: userId,
-                                        fromUserId: otherProfile.id,
-                                      ),
-                                      icon: const Icon(Icons.cancel_outlined),
-                                    ),
-                                  ],
-                                ),
+                          const SizedBox(width: 8),
+                        ],
+                      ),
+                      floatingActionButton: FloatingActionButton.extended(
+                        onPressed: () => _showAddFriendSheet(context, userId),
+                        icon: const Icon(Icons.person_add_alt_1),
+                        label: const Text('Add Friend'),
+                      ),
+                      body: friendsSnapshot.hasError
+                          ? Center(
+                              child: Text(
+                                'Failed to load friends: ${friendsSnapshot.error}',
                               ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _SectionTitle(
-                          title: 'Outgoing Requests',
-                          count: outgoingRequests.length,
-                        ),
-                        const SizedBox(height: 8),
-                        _ProfileLookupList(
-                          ids: outgoingRequests
-                              .map((request) => request.otherUserId)
-                              .toList(),
-                          emptyTitle: 'No pending requests',
-                          emptySubtitle:
-                              'Requests you send will stay here until accepted or canceled.',
-                          itemBuilder: (otherProfile) {
-                            final request = outgoingRequests.firstWhere(
-                              (item) => item.otherUserId == otherProfile.id,
-                            );
-                            return Card(
-                              child: ListTile(
-                                leading: UserAvatar(
-                                  profile: otherProfile,
-                                  radius: 20,
-                                ),
-                                title: Text(otherProfile.displayName),
-                                subtitle: Text(
-                                  '@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}',
-                                ),
-                                trailing: TextButton(
-                                  onPressed: () => _cancelRequest(
-                                    userId: userId,
-                                    toUserId: otherProfile.id,
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.all(16),
+                              children: [
+                                if (friends.isEmpty)
+                                  Card(
+                                    child: ListTile(
+                                      leading: const Icon(Icons.people_outline),
+                                      title: const Text('No friends yet'),
+                                      subtitle: const Text(
+                                        'Tap "Add Friend" to start building your social layer.',
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  _ProfileLookupList(
+                                    ids: friends
+                                        .map((f) => f.friendUserId)
+                                        .toList(),
+                                    emptyTitle: 'No friends yet',
+                                    emptySubtitle:
+                                        'Tap "Add Friend" to start building your social layer.',
+                                    itemBuilder: (otherProfile) {
+                                      final friend = friends.firstWhere(
+                                        (item) =>
+                                            item.friendUserId ==
+                                            otherProfile.id,
+                                      );
+                                      return Card(
+                                        child: ListTile(
+                                          onTap: () => _openFullProfile(
+                                            otherProfile,
+                                            friend,
+                                          ),
+                                          leading: _PresenceAvatar(
+                                            profile: otherProfile,
+                                            radius: 22,
+                                          ),
+                                          title: Text(otherProfile.displayName),
+                                          subtitle: Text(
+                                            '@${otherProfile.username} • ${_presenceLabel(otherProfile)}',
+                                          ),
+                                          trailing: PopupMenuButton<String>(
+                                            onSelected: (value) {
+                                              if (value == 'view') {
+                                                _openFullProfile(
+                                                  otherProfile,
+                                                  friend,
+                                                );
+                                              }
+                                              if (value == 'remove') {
+                                                _removeFriend(
+                                                  userId: userId,
+                                                  friendUserId: otherProfile.id,
+                                                );
+                                              }
+                                            },
+                                            itemBuilder: (context) => const [
+                                              PopupMenuItem(
+                                                value: 'view',
+                                                child: Text('View profile'),
+                                              ),
+                                              PopupMenuItem(
+                                                value: 'remove',
+                                                child: Text('Remove friend'),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                  child: const Text('Cancel'),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _SectionTitle(title: 'Friends', count: friends.length),
-                        const SizedBox(height: 8),
-                        _ProfileLookupList(
-                          ids: friends
-                              .map((friend) => friend.friendUserId)
-                              .toList(),
-                          emptyTitle: 'No friends yet',
-                          emptySubtitle:
-                              'Add people by username to start building your social layer.',
-                          itemBuilder: (otherProfile) {
-                            final friend = friends.firstWhere(
-                              (item) => item.friendUserId == otherProfile.id,
-                            );
-                            return Card(
-                              child: ListTile(
-                                leading: UserAvatar(
-                                  profile: otherProfile,
-                                  radius: 20,
-                                ),
-                                title: Text(otherProfile.displayName),
-                                subtitle: Text(
-                                  '@${otherProfile.username} • ${otherProfile.currentMode?.label ?? 'No mode set'}',
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'view') {
-                                      _showFriendQuickProfile(
-                                        otherProfile,
-                                        friend,
-                                      );
-                                    }
-                                    if (value == 'remove') {
-                                      _removeFriend(
-                                        userId: userId,
-                                        friendUserId: otherProfile.id,
-                                      );
-                                    }
-                                  },
-                                  itemBuilder: (context) => const [
-                                    PopupMenuItem(
-                                      value: 'view',
-                                      child: Text('View profile'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'remove',
-                                      child: Text('Remove friend'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                                const SizedBox(height: 80),
+                              ],
+                            ),
                     );
                   },
                 );
               },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAddFriendSheet(BuildContext context, String userId) {
+    _usernameController.clear();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 32,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Add a Friend',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Send a request using an exact username.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _usernameController,
+                    textInputAction: TextInputAction.done,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      hintText: 'friend_username',
+                      border: OutlineInputBorder(),
+                      prefixText: '@',
+                    ),
+                    onSubmitted: (_) {
+                      _sendRequest(currentUserId: userId);
+                      Navigator.of(sheetContext).pop();
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _isSendingRequest
+                          ? null
+                          : () {
+                              _sendRequest(currentUserId: userId);
+                              Navigator.of(sheetContext).pop();
+                            },
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: Text(
+                        _isSendingRequest
+                            ? 'Sending...'
+                            : 'Send Friend Request',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showRequestsSheet(
+    BuildContext context,
+    String userId,
+    List<FriendRequest> incoming,
+    List<FriendRequest> outgoing,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (_, controller) {
+            return ListView(
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        sheetContext,
+                      ).colorScheme.onSurface.withAlpha(50),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Text(
+                  'Friend Requests',
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                _SectionTitle(title: 'Incoming', count: incoming.length),
+                const SizedBox(height: 8),
+                _ProfileLookupList(
+                  ids: incoming.map((r) => r.otherUserId).toList(),
+                  emptyTitle: 'No incoming requests',
+                  emptySubtitle:
+                      'When someone adds you, the request will appear here.',
+                  itemBuilder: (otherProfile) {
+                    final request = incoming.firstWhere(
+                      (r) => r.otherUserId == otherProfile.id,
+                    );
+                    return Card(
+                      child: ListTile(
+                        leading: UserAvatar(profile: otherProfile, radius: 20),
+                        title: Text(otherProfile.displayName),
+                        subtitle: Text(
+                          '@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}',
+                        ),
+                        trailing: Wrap(
+                          spacing: 4,
+                          children: [
+                            IconButton(
+                              tooltip: 'Accept',
+                              onPressed: () {
+                                _acceptRequest(
+                                  userId: userId,
+                                  fromUserId: otherProfile.id,
+                                );
+                                Navigator.of(sheetContext).maybePop();
+                              },
+                              icon: const Icon(
+                                Icons.check_circle_outline,
+                                color: Color(0xFF22C55E),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Reject',
+                              onPressed: () {
+                                _rejectRequest(
+                                  userId: userId,
+                                  fromUserId: otherProfile.id,
+                                );
+                                Navigator.of(sheetContext).maybePop();
+                              },
+                              icon: const Icon(
+                                Icons.cancel_outlined,
+                                color: Color(0xFFEF4444),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                _SectionTitle(title: 'Outgoing', count: outgoing.length),
+                const SizedBox(height: 8),
+                _ProfileLookupList(
+                  ids: outgoing.map((r) => r.otherUserId).toList(),
+                  emptyTitle: 'No pending requests',
+                  emptySubtitle: 'Requests you send will appear here.',
+                  itemBuilder: (otherProfile) {
+                    final request = outgoing.firstWhere(
+                      (r) => r.otherUserId == otherProfile.id,
+                    );
+                    return Card(
+                      child: ListTile(
+                        leading: UserAvatar(profile: otherProfile, radius: 20),
+                        title: Text(otherProfile.displayName),
+                        subtitle: Text(
+                          '@${otherProfile.username} • ${_formatDate(request.createdAtUtc)}',
+                        ),
+                        trailing: TextButton(
+                          onPressed: () {
+                            _cancelRequest(
+                              userId: userId,
+                              toUserId: otherProfile.id,
+                            );
+                            Navigator.of(sheetContext).maybePop();
+                          },
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             );
           },
         );
@@ -402,81 +491,20 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     }
   }
 
-  Future<void> _showFriendQuickProfile(
-    UserProfile profile,
-    FriendConnection connection,
-  ) async {
-    final taskRepository = ref.read(taskRepositoryProvider);
-    final completionRepository = ref.read(completionRepositoryProvider);
-    final localDateKey = _safeLocalDateKey(profile);
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(profile.displayName),
-          content: StreamBuilder<List<Task>>(
-            stream: taskRepository.watchUserTasks(profile.id),
-            builder: (context, taskSnapshot) {
-              final activeTasks = (taskSnapshot.data ?? const <Task>[])
-                  .where((task) => task.active)
-                  .toList();
-
-              return StreamBuilder<List<TaskCompletion>>(
-                stream: completionRepository.watchUserCompletionsForDate(
-                  userId: profile.id,
-                  localDateKey: localDateKey,
-                ),
-                builder: (context, completionSnapshot) {
-                  final completions =
-                      completionSnapshot.data ?? const <TaskCompletion>[];
-                  final doneCount = completions
-                      .where((item) => item.status == CompletionStatus.done)
-                      .length;
-                  final summary =
-                      '$doneCount/${activeTasks.length} done • ${activeTasks.isEmpty ? 'No active task' : activeTasks.first.title}';
-
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('@${profile.username}'),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Mode: ${profile.currentMode?.label ?? 'No mode set'}',
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Timezone: ${profile.timezone} • Owner day: $localDateKey',
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Friends since: ${_formatDate(connection.createdAtUtc)}',
-                      ),
-                      const SizedBox(height: 6),
-                      Text(summary),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Close'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                _openFullProfile(profile, connection);
-              },
-              child: const Text('Show Full Profile'),
-            ),
-          ],
-        );
-      },
-    );
+  String _presenceLabel(UserProfile p) {
+    final lastSeen = p.lastSeenAtUtc;
+    if (p.isOnline &&
+        lastSeen != null &&
+        DateTime.now().toUtc().difference(lastSeen).inSeconds <= 70) {
+      return 'Online now';
+    }
+    if (lastSeen != null) {
+      final diff = DateTime.now().toUtc().difference(lastSeen);
+      if (diff.inSeconds > 70 && diff.inMinutes < 10) return 'Idle';
+      if (diff.inMinutes < 60) return 'Last seen ${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return 'Last seen ${diff.inHours}h ago';
+    }
+    return p.currentMode?.label ?? 'Offline';
   }
 
   void _openFullProfile(UserProfile profile, FriendConnection connection) {
@@ -488,18 +516,6 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         ),
       ),
     );
-  }
-
-  String _safeLocalDateKey(UserProfile profile) {
-    try {
-      return _timeService.localDateKeyForUtcInstant(
-        instantUtc: DateTime.now().toUtc(),
-        timezone: profile.timezone,
-        dayStartHour: profile.dayStartHour,
-      );
-    } catch (_) {
-      return DateFormat('yyyy-MM-dd').format(DateTime.now().toUtc());
-    }
   }
 
   String _formatDate(DateTime value) {
@@ -608,6 +624,59 @@ class _FriendsNoDataRuntimeScreen extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Avatar widget that overlays a coloured presence dot.
+class _PresenceAvatar extends StatelessWidget {
+  const _PresenceAvatar({required this.profile, required this.radius});
+
+  final UserProfile profile;
+  final double radius;
+
+  static Color? _dotColor(UserProfile p) {
+    final lastSeen = p.lastSeenAtUtc;
+    if (p.isOnline &&
+        lastSeen != null &&
+        DateTime.now().toUtc().difference(lastSeen).inSeconds <= 70) {
+      return const Color(0xFF22C55E); // green — online
+    }
+    if (lastSeen != null) {
+      final diff = DateTime.now().toUtc().difference(lastSeen);
+      if (diff.inSeconds > 70 && diff.inMinutes < 10) {
+        return const Color(0xFFF59E0B); // amber — idle
+      }
+    }
+    return null; // no dot — offline
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = _dotColor(profile);
+    final dotSize = radius * 0.5;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        UserAvatar(profile: profile, radius: radius),
+        if (dot != null)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: dotSize,
+              height: dotSize,
+              decoration: BoxDecoration(
+                color: dot,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.surface,
+                  width: 2,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

@@ -108,4 +108,114 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData dark() {
+    const primary = Color(0xFF3B82F6);
+    const surface = Color(0xFF0F172A);
+    const surfaceCard = Color(0xFF1E293B);
+    const textPrimary = Color(0xFFF1F5F9);
+
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.dark,
+      primary: primary,
+      surface: surface,
+      onSurface: textPrimary,
+      surfaceContainerHighest: const Color(0xFF334155),
+    );
+
+    final baseTextTheme = GoogleFonts.interTextTheme(
+      ThemeData(brightness: Brightness.dark).textTheme,
+    );
+
+    return ThemeData(
+      colorScheme: colorScheme,
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: surface,
+      textTheme: baseTextTheme,
+      appBarTheme: AppBarTheme(
+        centerTitle: false,
+        backgroundColor: surface,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        iconTheme: const IconThemeData(color: textPrimary),
+        titleTextStyle: baseTextTheme.titleLarge?.copyWith(
+          color: textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: surfaceCard,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF334155)),
+        ),
+        margin: EdgeInsets.zero,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceCard,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF475569)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF475569)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: primary, width: 2),
+        ),
+        labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: surfaceCard,
+        elevation: 0,
+        indicatorColor: primary.withAlpha(51),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: primary,
+            );
+          }
+          return const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF94A3B8),
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: primary);
+          }
+          return const IconThemeData(color: Color(0xFF94A3B8));
+        }),
+      ),
+    );
+  }
 }

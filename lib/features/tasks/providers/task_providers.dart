@@ -12,3 +12,12 @@ final completionRepositoryProvider = Provider<CompletionRepository>((ref) {
   final firestore = ref.watch(firebaseFirestoreProvider);
   return CompletionRepository(firestore);
 });
+
+/// Provides the current streak (consecutive completed days) for a given userId.
+final streakProvider = FutureProvider.autoDispose.family<int, String>((
+  ref,
+  userId,
+) async {
+  final repo = ref.read(completionRepositoryProvider);
+  return repo.computeStreak(userId: userId);
+});

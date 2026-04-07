@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:coworkplace/app/session/app_session_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:coworkplace/features/goals/domain/goal.dart';
@@ -311,11 +313,21 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
 
   void _shareGoal(Goal goal, GoalMetrics metrics, BuildContext context) {
     final unit = _goalUnitLabel(goal);
+    final progress = metrics.progressPercent.toStringAsFixed(1);
+    final deadline = goal.deadlineUtc != null
+        ? ' · ${metrics.remainingDays} day${metrics.remainingDays == 1 ? '' : 's'} left'
+        : '';
     final text =
-        '${goal.title}\n'
-        '${metrics.progressPercent.toStringAsFixed(1)}% complete \u2014 '
-        '${_formatNumber(metrics.completed)} / ${_formatNumber(metrics.target)} $unit'
-        '\n\nTracked with Coworkplace';
+        '🎯 I\'m working on: ${goal.title}\n'
+        '$progress% done — ${_formatNumber(metrics.completed)} / ${_formatNumber(metrics.target)} $unit$deadline\n\n'
+        'Join me on Coworkplace to track your goals and tasks together! 🚀';
+    if (kIsWeb) {
+      Clipboard.setData(ClipboardData(text: text));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('📋 Goal text copied to clipboard!')),
+      );
+      return;
+    }
     SharePlus.instance.share(ShareParams(text: text));
   }
 }
@@ -1664,26 +1676,135 @@ class _GoalEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    final cs = Theme.of(context).colorScheme;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 16),
+          Icon(Icons.track_changes, size: 56, color: cs.primary),
+          const SizedBox(height: 12),
+          Text('No goals yet', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(
+            'Set a goal, break it into steps, and track your progress every day.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 24),
+          // How-it-works guide
+          _HowItWorksGuide(),
+          const SizedBox(height: 28),
+          FilledButton.icon(
+            onPressed: onCreate,
+            icon: const Icon(Icons.add),
+            label: const Text('Create Goal'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HowItWorksGuide extends StatelessWidget {
+  const _HowItWorksGuide();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final steps = [
+      (
+        icon: Icons.add_circle_outline,
+        title: 'Create a goal',
+        desc:
+            'Pick a target — like "Run 50 km" or "Read 6 books". '
+            'Set a deadline for pacing guidance.',
+      ),
+      (
+        icon: Icons.playlist_add_check,
+        title: 'Add items (optional)',
+        desc:
+            'Break the goal into trackable items, e.g. specific books or '
+            'workout sessions.',
+      ),
+      (
+        icon: Icons.trending_up,
+        title: 'Log progress',
+        desc:
+            'Mark items complete or tap "Add Progress" to log numbers. '
+            'Watch your progress bar grow.',
+      ),
+      (
+        icon: Icons.people_alt_outlined,
+        title: 'Visible to friends',
+        desc:
+            'Your progress appears on the home feed so friends can cheer '
+            'you on.',
+      ),
+    ];
+
+    return Card(
+      color: cs.surfaceContainerHighest,
+      elevation: 0,
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.track_changes, size: 52),
+            Text('How it works', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 12),
-            Text('No goals yet', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            const Text(
-              'Create your first goal to track progress, pace, and remaining work.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: onCreate,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Goal'),
-            ),
+            for (var i = 0; i < steps.length; i++) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${i + 1}',
+                      style: TextStyle(
+                        color: cs.onPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(steps[i].icon, size: 16, color: cs.primary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                steps[i].title,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          steps[i].desc,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (i < steps.length - 1) const SizedBox(height: 14),
+            ],
           ],
         ),
       ),
@@ -1864,6 +1985,70 @@ Future<double?> _showAddProgressDialog({required BuildContext context}) {
   );
 }
 
+// ── Sample Goal Templates ─────────────────────────────────────────────────────
+
+class _SampleGoalTemplate {
+  const _SampleGoalTemplate({
+    required this.title,
+    required this.unitType,
+    required this.target,
+    this.isSimpleGoal = true,
+    this.icon = Icons.flag_rounded,
+  });
+
+  final String title;
+  final GoalUnitType unitType;
+  final double target;
+  final bool isSimpleGoal;
+  final IconData icon;
+}
+
+const _kSampleGoalTemplates = <_SampleGoalTemplate>[
+  _SampleGoalTemplate(
+    title: 'Running',
+    unitType: GoalUnitType.kilometers,
+    target: 50,
+    icon: Icons.directions_run,
+  ),
+  _SampleGoalTemplate(
+    title: 'Workout',
+    unitType: GoalUnitType.workouts,
+    target: 30,
+    icon: Icons.fitness_center,
+  ),
+  _SampleGoalTemplate(
+    title: 'Reading Books',
+    unitType: GoalUnitType.books,
+    target: 6,
+    isSimpleGoal: false,
+    icon: Icons.menu_book,
+  ),
+  _SampleGoalTemplate(
+    title: 'Walking Steps',
+    unitType: GoalUnitType.steps,
+    target: 300000,
+    icon: Icons.directions_walk,
+  ),
+  _SampleGoalTemplate(
+    title: 'Meditation',
+    unitType: GoalUnitType.min,
+    target: 1800,
+    icon: Icons.self_improvement,
+  ),
+  _SampleGoalTemplate(
+    title: 'Cycling',
+    unitType: GoalUnitType.kilometers,
+    target: 100,
+    icon: Icons.pedal_bike,
+  ),
+  _SampleGoalTemplate(
+    title: 'Calories Burned',
+    unitType: GoalUnitType.calories,
+    target: 30000,
+    icon: Icons.local_fire_department,
+  ),
+];
+
 class _GoalFormSheet extends StatefulWidget {
   const _GoalFormSheet({this.existing});
 
@@ -1904,6 +2089,17 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
 
   void _onTargetChanged() => setState(() {});
 
+  void _applyTemplate(_SampleGoalTemplate t) {
+    setState(() {
+      _titleController.text = t.title;
+      _unitType = t.unitType;
+      _isSimpleGoal = t.isSimpleGoal;
+      _targetController.text = t.target % 1 == 0
+          ? t.target.toInt().toString()
+          : t.target.toString();
+    });
+  }
+
   @override
   void dispose() {
     _targetController.removeListener(_onTargetChanged);
@@ -1930,7 +2126,33 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
                 widget.existing == null ? 'Create Goal' : 'Edit Goal',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 12),
+              if (widget.existing == null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Quick templates',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 36,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _kSampleGoalTemplates.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final t = _kSampleGoalTemplates[i];
+                      return ActionChip(
+                        avatar: Icon(t.icon, size: 16),
+                        label: Text(t.title),
+                        onPressed: () => _applyTemplate(t),
+                        visualDensity: VisualDensity.compact,
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ] else
+                const SizedBox(height: 12),
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(labelText: 'Goal title'),

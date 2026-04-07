@@ -1,21 +1,42 @@
 import 'package:coworkplace/app/session/app_session_provider.dart';
+import 'package:coworkplace/app/theme/theme_mode_provider.dart';
+import 'package:coworkplace/core/notifications/notification_service.dart';
 import 'package:coworkplace/features/auth/providers/auth_providers.dart';
 import 'package:coworkplace/features/profile/domain/user_profile.dart';
 import 'package:coworkplace/features/profile/providers/profile_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:hive/hive.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   static const _timezoneOptions = [
     _TimezoneOption(value: 'Asia/Dhaka', label: 'Bangladesh (Asia/Dhaka)'),
-    _TimezoneOption(value: 'America/New_York', label: 'New York (America/New_York)'),
+    _TimezoneOption(
+      value: 'America/New_York',
+      label: 'New York (America/New_York)',
+    ),
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  static const _kNotifKey = 'notif_daily_enabled';
+
+  bool _notifEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final box = Hive.box<int>('app_prefs');
+    _notifEnabled = (box.get(_kNotifKey, defaultValue: 0)! == 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(appSessionProvider).valueOrNull;
     final profile = session?.profile;
 
@@ -26,22 +47,77 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           Card(
             child: ListTile(
-              leading: const Icon(Icons.manage_accounts),
+              leading: const Icon(
+                Icons.manage_accounts,
+                color: Color(0xFF3B82F6),
+              ),
               title: const Text('Profile Settings'),
               subtitle: Text(
                 profile == null
-                    ? 'Display name, timezone, and day start settings.'
-                    : '${profile.displayName} • ${profile.timezone} • ${_formatDayStart(profile.dayStartHour)}',
+                    ? 'Display name and timezone settings.'
+                    : '${profile.displayName} • ${profile.timezone}',
               ),
-              onTap: () => _showProfileSettingsDialog(context, ref, profile),
+              onTap: () => _showProfileSettingsDialog(context, profile),
             ),
           ),
           const SizedBox(height: 12),
           Card(
-            child: const ListTile(
-              leading: Icon(Icons.mood_outlined),
-              title: Text('Current Mode Presets'),
-              subtitle: Text(
+            child: SwitchListTile.adaptive(
+              secondary: const Icon(
+                Icons.notifications_outlined,
+                color: Color(0xFF8B5CF6),
+              ),
+              title: const Text('Daily Reminder'),
+              subtitle: const Text('Get a notification before the day resets.'),
+              value: _notifEnabled,
+              onChanged: (value) => _toggleDailyReminder(value),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: Icon(
+                _themeModeIcon(ref.watch(themeModeProvider)),
+                color: const Color(0xFFF59E0B),
+              ),
+              title: const Text('Theme'),
+              subtitle: Text(_themeModeName(ref.watch(themeModeProvider))),
+              trailing: SegmentedButton<ThemeMode>(
+                showSelectedIcon: false,
+                style: SegmentedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+                segments: const [
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    icon: Icon(Icons.brightness_auto, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    icon: Icon(Icons.light_mode, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    icon: Icon(Icons.dark_mode, size: 16),
+                  ),
+                ],
+                selected: {ref.watch(themeModeProvider)},
+                onSelectionChanged: (modes) {
+                  ref.read(themeModeProvider.notifier).setMode(modes.first);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(
+                Icons.mood_outlined,
+                color: Color(0xFF8B5CF6),
+              ),
+              title: const Text('Current Mode Presets'),
+              subtitle: const Text(
                 'Manage preset options for daily mood/status updates.',
               ),
             ),
@@ -49,7 +125,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.logout),
+              leading: const Icon(Icons.logout, color: Color(0xFFEF4444)),
               title: const Text('Logout'),
               subtitle: const Text('Sign out and return to login options.'),
               onTap: () async {
@@ -61,11 +137,13 @@ class SettingsScreen extends ConsumerWidget {
                       content: const Text('Do you want to sign out now?'),
                       actions: [
                         TextButton(
-                          onPressed: () => Navigator.of(dialogContext).pop(false),
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(false),
                           child: const Text('Cancel'),
                         ),
                         FilledButton(
-                          onPressed: () => Navigator.of(dialogContext).pop(true),
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(true),
                           child: const Text('Logout'),
                         ),
                       ],
@@ -95,9 +173,44 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  static String _themeModeName(ThemeMode m) => switch (m) {
+    ThemeMode.light => 'Light',
+    ThemeMode.dark => 'Dark',
+    _ => 'System',
+  };
+
+  static IconData _themeModeIcon(ThemeMode m) => switch (m) {
+    ThemeMode.light => Icons.light_mode,
+    ThemeMode.dark => Icons.dark_mode,
+    _ => Icons.brightness_auto,
+  };
+
+  Future<void> _toggleDailyReminder(bool enable) async {
+    if (enable) {
+      final granted = await NotificationService.requestPermission();
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Notification permission denied. Please enable it in settings.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      await NotificationService.scheduleDailyReminder();
+    } else {
+      await NotificationService.cancelDailyReminder();
+    }
+    final box = Hive.box<int>('app_prefs');
+    await box.put(_kNotifKey, enable ? 1 : 0);
+    if (mounted) setState(() => _notifEnabled = enable);
+  }
+
   Future<void> _showProfileSettingsDialog(
     BuildContext context,
-    WidgetRef ref,
     UserProfile? profile,
   ) async {
     if (profile == null) {
@@ -107,9 +220,10 @@ class SettingsScreen extends ConsumerWidget {
       return;
     }
 
-    final displayNameController = TextEditingController(text: profile.displayName);
+    final displayNameController = TextEditingController(
+      text: profile.displayName,
+    );
     var selectedTimezone = profile.timezone;
-    var selectedDayStartHour = profile.dayStartHour;
 
     final draft = await showModalBottomSheet<_ProfileSettingsDraft>(
       context: context,
@@ -149,7 +263,7 @@ class SettingsScreen extends ConsumerWidget {
                         border: OutlineInputBorder(),
                       ),
                       items: [
-                        for (final option in _timezoneOptions)
+                        for (final option in SettingsScreen._timezoneOptions)
                           DropdownMenuItem(
                             value: option.value,
                             child: Text(option.label),
@@ -164,28 +278,7 @@ class SettingsScreen extends ConsumerWidget {
                         });
                       },
                     ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.schedule_outlined),
-                      title: const Text('Day Start Time'),
-                      subtitle: Text(_formatDayStart(selectedDayStartHour)),
-                      trailing: TextButton(
-                        onPressed: () async {
-                          final picked = await showTimePicker(
-                            context: sheetContext,
-                            initialTime: TimeOfDay(hour: selectedDayStartHour, minute: 0),
-                          );
-                          if (picked == null) {
-                            return;
-                          }
-                          setModalState(() {
-                            selectedDayStartHour = picked.hour;
-                          });
-                        },
-                        child: const Text('Change'),
-                      ),
-                    ),
+
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -194,9 +287,9 @@ class SettingsScreen extends ConsumerWidget {
                             onPressed: () {
                               Navigator.of(sheetContext).pop(
                                 _ProfileSettingsDraft(
-                                  displayName: displayNameController.text.trim(),
+                                  displayName: displayNameController.text
+                                      .trim(),
                                   timezone: selectedTimezone,
-                                  dayStartHour: selectedDayStartHour,
                                 ),
                               );
                             },
@@ -231,7 +324,6 @@ class SettingsScreen extends ConsumerWidget {
     final updated = profile.copyWith(
       displayName: draft.displayName,
       timezone: draft.timezone,
-      dayStartHour: draft.dayStartHour,
     );
 
     try {
@@ -252,11 +344,6 @@ class SettingsScreen extends ConsumerWidget {
       );
     }
   }
-
-  static String _formatDayStart(int dayStartHour) {
-    final dt = DateTime(2000, 1, 1, dayStartHour, 0);
-    return DateFormat('hh:mm a').format(dt);
-  }
 }
 
 class _TimezoneOption {
@@ -270,10 +357,8 @@ class _ProfileSettingsDraft {
   const _ProfileSettingsDraft({
     required this.displayName,
     required this.timezone,
-    required this.dayStartHour,
   });
 
   final String displayName;
   final String timezone;
-  final int dayStartHour;
 }

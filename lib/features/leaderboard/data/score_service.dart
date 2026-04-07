@@ -78,6 +78,60 @@ class ScoreService {
     }
   }
 
+  // Award 2 points when user opens the app, once per 2-hour window (idempotent).
+  Future<void> awardAppOpen({required String userId, DateTime? atUtc}) async {
+    final now = (atUtc ?? DateTime.now()).toUtc();
+    final slot = now.hour ~/ 2; // 0-11 → one slot per 2 hours
+    final slotKey =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}-open$slot';
+    final slotRef = _firestore.doc('users/$userId/appOpenSlots/$slotKey');
+
+    final weekId = weekPeriodId(now);
+    final monthId = monthPeriodId(now);
+    final allId = alltimePeriodId();
+
+    try {
+      await _firestore.runTransaction((tx) async {
+        final slotSnap = await tx.get(slotRef);
+        if (slotSnap.exists) return; // already awarded for this 2-hour window
+
+        tx.set(slotRef, {'createdAt': FieldValue.serverTimestamp()});
+
+        final weekRef = _firestore.doc('users/$userId/scores/$weekId');
+        final monthRef = _firestore.doc('users/$userId/scores/$monthId');
+        final allRef = _firestore.doc('users/$userId/scores/$allId');
+
+        for (final ref in [weekRef, monthRef, allRef]) {
+          tx.set(ref, {
+            'periodId': ref == weekRef
+                ? weekId
+                : ref == monthRef
+                ? monthId
+                : allId,
+            'points': FieldValue.increment(2),
+            'updatedAtUtc': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      });
+    } catch (e, st) {
+      debugPrint('awardAppOpen failed: $e\n$st');
+      rethrow;
+    }
+  }
+
+  // Fetch all-time points for a single user. Returns 0 if no record exists.
+  Future<int> getPointsForUser(String userId) async {
+    try {
+      final snap = await _firestore
+          .doc('users/$userId/scores/${alltimePeriodId()}')
+          .get();
+      if (!snap.exists) return 0;
+      return (snap.data()?['points'] ?? 0) as int;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   // Like a task (owner gets a point). Ensures unique like per likerId via deterministic doc id.
   // Enforces a maximum of 10 votes per calendar day per user.
   Future<void> awardVote({
