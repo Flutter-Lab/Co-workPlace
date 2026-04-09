@@ -22,6 +22,7 @@ Entire App  (max-width 600px on web · 420px native)
 │               ├── ⭐ pts badge · 🔥 streak badge (self only)
 │               └── expand → task list with status icons
 ├── Tab 1 · Goals (GoalDashboardScreen)  ← +1 pt on create/update (once/hr · animation)
+│   └── GoalDetailScreen → heatmap · Add Progress dialog (advanced: log for past date · extra step)
 ├── Tab 2 · Friends (FriendsScreen)  ← badge clears on visit
 │   ├── Friends list with presence avatars
 │   ├── FAB → "Add Friend" bottom sheet (username search)
@@ -30,26 +31,21 @@ Entire App  (max-width 600px on web · 420px native)
     ├── _ProfileHeader (avatar · name · streak badge)
     ├── Current Mode card
     ├── Account Security card
-    ├── ★ Points card  (all-time pts · "+2 pts / 2 hrs" hint · tap → PointsLogScreen)
-    │   └── PointsLogScreen  →  all period scores (alltime · monthly · weekly)
+    ├── ★ Points card  (all-time pts · live stream · "+2 pts / 2 hrs" hint · tap → PointsLogScreen)
+    │   └── PointsLogScreen  →  transaction log (banking style: delta · reason · balance · timestamp)
     │       └── ℹ info button  →  PointsInfoScreen (how to earn pts table)
     ├── Filter chips + Reset Today
     ├── _TodayStatsRow (done · skipped · pending chips)
-    └── Task list (daily / one-time · check / skip actions · +3 pts animation on done)
+    └── Task list (daily / one-time · check / skip · undo · +3 pts on done · -3 pts on undo)
 
 
 -----Don't Update anything bellow this line------
 
 
 Current Problems and Solutions:
-  1. Point Log Screen will show Points add time and reason (transaction style). And every update show the Total points.
-  2. Completing task Adding point but Undone/Undo complete is not subtracting points. Fix this.
-  3. Point value is not updating instantly in Point card when I see the animation of point add.
-  4. 
-  5. 
-  6. 
-  7. Test everything you updated in code and comfirm updates are working properly.
-  8. Suggest next improvements and refining ideas.
+  1. Add an optional “initial completed units” input to the Simple Goal creation flow so users can bootstrap progress at creation time, without counting that entry as today’s heatmap progress.
+  2. Test everything you updated in code and comfirm updates are working properly.
+  3. Suggest next improvements and refining ideas.
 
 
 

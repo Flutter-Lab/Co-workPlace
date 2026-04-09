@@ -67,6 +67,7 @@ class GoalRepository {
     DateTime? startDateUtc,
     DateTime? deadlineUtc,
     bool isSimpleGoal = false,
+    double initialCompletedValue = 0,
   }) async {
     final trimmedTitle = title.trim();
     if (trimmedTitle.isEmpty) {
@@ -90,7 +91,7 @@ class GoalRepository {
       unitType: unitType,
       customUnitLabel: _normalizeCustomLabel(unitType, customUnitLabel),
       targetValue: targetValue,
-      completedValue: 0,
+      completedValue: initialCompletedValue.clamp(0.0, targetValue),
       itemCount: 0,
       isSimpleGoal: isSimpleGoal,
       startDateUtc: (startDateUtc ?? nowUtc).toUtc(),
@@ -178,6 +179,7 @@ class GoalRepository {
     required String userId,
     required String goalId,
     required double delta,
+    DateTime? atDateUtc, // null = today; supply a past date for backdating
   }) async {
     if (delta <= 0) {
       throw ArgumentError.value(
@@ -188,6 +190,11 @@ class GoalRepository {
     }
 
     final nowUtc = DateTime.now().toUtc();
+    // Use the supplied date for the heatmap key (normalised to local calendar day),
+    // or local today when no date is provided. updatedAtUtc always uses UTC.
+    final heatmapDate = atDateUtc != null
+        ? DateTime(atDateUtc.year, atDateUtc.month, atDateUtc.day)
+        : DateTime.now(); // local – correct calendar day for every timezone
     final goalRef = _goals(userId).doc(goalId);
 
     await _firestore.runTransaction((tx) async {
@@ -208,7 +215,7 @@ class GoalRepository {
       final appliedDelta = nextCompleted - currentCompleted;
       final nextDailyProgress = _nextDailyProgressMap(
         goalData: goalData,
-        nowUtc: nowUtc,
+        dateLocal: heatmapDate,
         delta: appliedDelta,
       );
 
@@ -225,7 +232,13 @@ class GoalRepository {
     String goalId, {
     int days = 112,
   }) {
-    final sinceUtc = DateTime.now().toUtc().subtract(Duration(days: days - 1));
+    // Use local today so the window aligns with the user's calendar.
+    final sinceLocal = DateTime.now().subtract(Duration(days: days - 1));
+    final sinceDay = DateTime(
+      sinceLocal.year,
+      sinceLocal.month,
+      sinceLocal.day,
+    );
 
     return _goals(userId).doc(goalId).snapshots().map((snapshot) {
       final goalData = snapshot.data() ?? const <String, dynamic>{};
@@ -239,7 +252,7 @@ class GoalRepository {
           }
 
           final parsed = _parseDateKey(key);
-          if (parsed == null || parsed.isBefore(sinceUtc)) {
+          if (parsed == null || parsed.isBefore(sinceDay)) {
             return;
           }
 
@@ -312,16 +325,13 @@ class GoalRepository {
       );
 
       tx.set(itemRef, created.toMap());
-      final nextDailyProgress = _nextDailyProgressMap(
-        goalData: goalData,
-        nowUtc: nowUtc,
-        delta: normalizedCompleted,
-      );
+      // Don't update dailyProgressByDate on item creation: initial completedUnits
+      // represents pre-existing progress the user is entering to bootstrap tracking,
+      // not work done today.
       tx.update(goalRef, {
         'completedValue': max(0.0, currentCompleted + normalizedCompleted),
         'itemCount': max(0, currentItemCount + 1),
         'updatedAtUtc': nowUtc.toIso8601String(),
-        'dailyProgressByDate': nextDailyProgress,
       });
     });
 
@@ -390,7 +400,7 @@ class GoalRepository {
       );
       final nextDailyProgress = _nextDailyProgressMap(
         goalData: goalData,
-        nowUtc: nowUtc,
+        dateLocal: DateTime.now(),
         delta: normalizedCompleted - oldCompleted,
       );
 
@@ -442,7 +452,7 @@ class GoalRepository {
       );
       final nextDailyProgress = _nextDailyProgressMap(
         goalData: goalData,
-        nowUtc: nowUtc,
+        dateLocal: DateTime.now(),
         delta: normalizedCompleted - oldCompleted,
       );
 
@@ -490,7 +500,7 @@ class GoalRepository {
       final currentItemCount = (goalData['itemCount'] as num?)?.toInt() ?? 0;
       final nextDailyProgress = _nextDailyProgressMap(
         goalData: goalData,
-        nowUtc: nowUtc,
+        dateLocal: DateTime.now(),
         delta: -oldCompleted,
       );
 
@@ -506,7 +516,7 @@ class GoalRepository {
 
   Map<String, double> _nextDailyProgressMap({
     required Map<String, dynamic> goalData,
-    required DateTime nowUtc,
+    required DateTime dateLocal, // local calendar date to key progress against
     required double delta,
     int keepDays = 180,
   }) {
@@ -522,7 +532,7 @@ class GoalRepository {
     }
 
     if (delta != 0) {
-      final key = _dateKey(nowUtc);
+      final key = _dateKey(dateLocal);
       final current = existing[key] ?? 0;
       final next = max<double>(0.0, current + delta);
       if (next == 0) {
@@ -532,11 +542,13 @@ class GoalRepository {
       }
     }
 
-    final minDate = nowUtc.toUtc().subtract(Duration(days: keepDays));
+    // Prune entries older than keepDays using local today.
+    final minDate = DateTime.now().subtract(Duration(days: keepDays));
+    final minDay = DateTime(minDate.year, minDate.month, minDate.day);
     final staleKeys = <String>[];
     existing.forEach((key, value) {
       final parsed = _parseDateKey(key);
-      if (parsed == null || parsed.isBefore(minDate)) {
+      if (parsed == null || parsed.isBefore(minDay)) {
         staleKeys.add(key);
       }
     });
@@ -547,11 +559,11 @@ class GoalRepository {
     return existing;
   }
 
-  String _dateKey(DateTime utc) {
-    final date = utc.toUtc();
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-    return '${date.year}-$month-$day';
+  String _dateKey(DateTime local) {
+    // Use the date fields as-is (caller must pass a local DateTime).
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day';
   }
 
   DateTime? _parseDateKey(String key) {
@@ -567,7 +579,7 @@ class GoalRepository {
       return null;
     }
 
-    return DateTime.utc(year, month, day);
+    return DateTime(year, month, day); // local calendar date
   }
 
   String? _normalizeCustomLabel(

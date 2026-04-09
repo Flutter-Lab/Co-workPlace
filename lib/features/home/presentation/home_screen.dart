@@ -804,6 +804,13 @@ class _FriendFeedTileState extends ConsumerState<_FriendFeedTile> {
                                                       localDateKey:
                                                           localDateKey,
                                                     );
+                                                try {
+                                                  await ScoreService()
+                                                      .revokeCompletion(
+                                                        userId:
+                                                            widget.profile.id,
+                                                      );
+                                                } catch (_) {}
                                                 if (!context.mounted) return;
                                                 ScaffoldMessenger.of(
                                                   context,

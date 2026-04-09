@@ -56,7 +56,7 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
           ),
           body: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: kIsWeb ? 600 : 420),
               child: goalsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stackTrace) => Center(
@@ -143,7 +143,7 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
                                   onAddItem: () => _onCreateItem(
                                     context: context,
                                     userId: userId,
-                                    goalId: goal.id,
+                                    goal: goal,
                                   ),
                                   onAddProgress: () => _onAddSimpleProgress(
                                     context: context,
@@ -211,6 +211,7 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
             startDateUtc: draft.startDateUtc,
             deadlineUtc: draft.deadlineUtc,
             isSimpleGoal: draft.isSimpleGoal,
+            initialCompletedValue: draft.initialCompletedValue,
           );
       // Award 1 pt for creating a goal, once per hour
       try {
@@ -275,9 +276,12 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
   Future<void> _onCreateItem({
     required BuildContext context,
     required String userId,
-    required String goalId,
+    required Goal goal,
   }) async {
-    final draft = await _showGoalItemFormSheet(context: context);
+    final draft = await _showGoalItemFormSheet(
+      context: context,
+      parentUnitLabel: _goalUnitLabel(goal),
+    );
     if (draft == null) {
       return;
     }
@@ -287,7 +291,7 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
           .read(goalRepositoryProvider)
           .createItem(
             userId: userId,
-            goalId: goalId,
+            goalId: goal.id,
             name: draft.name,
             totalUnits: draft.totalUnits,
             completedUnits: draft.completedUnits,
@@ -308,15 +312,20 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
     required String userId,
     required String goalId,
   }) async {
-    final delta = await _showAddProgressDialog(context: context);
-    if (delta == null) {
+    final result = await _showAddProgressDialog(context: context);
+    if (result == null) {
       return;
     }
 
     try {
       await ref
           .read(goalRepositoryProvider)
-          .addSimpleProgress(userId: userId, goalId: goalId, delta: delta);
+          .addSimpleProgress(
+            userId: userId,
+            goalId: goalId,
+            delta: result.delta,
+            atDateUtc: result.atDateUtc,
+          );
     } catch (e) {
       if (!context.mounted) {
         return;
@@ -420,7 +429,7 @@ class GoalDetailScreen extends ConsumerWidget {
                   label: const Text('Add Progress'),
                 )
               : FloatingActionButton.extended(
-                  onPressed: () => _addItem(context, ref, goal.id),
+                  onPressed: () => _addItem(context, ref, goal),
                   icon: const Icon(Icons.add),
                   label: const Text('Add Item'),
                 ),
@@ -498,7 +507,7 @@ class GoalDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 8),
                       if (items.isEmpty)
                         _GoalItemsEmptyState(
-                          onCreate: () => _addItem(context, ref, goal.id),
+                          onCreate: () => _addItem(context, ref, goal),
                         )
                       else
                         ...items.map(
@@ -516,7 +525,7 @@ class GoalDetailScreen extends ConsumerWidget {
                               onEdit: () => _editItem(
                                 context: context,
                                 ref: ref,
-                                goalId: goal.id,
+                                goal: goal,
                                 item: item,
                               ),
                               onDelete: () => _deleteItem(
@@ -663,12 +672,11 @@ class GoalDetailScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _addItem(
-    BuildContext context,
-    WidgetRef ref,
-    String goalId,
-  ) async {
-    final draft = await _showGoalItemFormSheet(context: context);
+  Future<void> _addItem(BuildContext context, WidgetRef ref, Goal goal) async {
+    final draft = await _showGoalItemFormSheet(
+      context: context,
+      parentUnitLabel: _goalUnitLabel(goal),
+    );
     if (draft == null) {
       return;
     }
@@ -678,7 +686,7 @@ class GoalDetailScreen extends ConsumerWidget {
           .read(goalRepositoryProvider)
           .createItem(
             userId: userId,
-            goalId: goalId,
+            goalId: goal.id,
             name: draft.name,
             totalUnits: draft.totalUnits,
             completedUnits: draft.completedUnits,
@@ -699,15 +707,20 @@ class GoalDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     String goalId,
   ) async {
-    final delta = await _showAddProgressDialog(context: context);
-    if (delta == null) {
+    final result = await _showAddProgressDialog(context: context);
+    if (result == null) {
       return;
     }
 
     try {
       await ref
           .read(goalRepositoryProvider)
-          .addSimpleProgress(userId: userId, goalId: goalId, delta: delta);
+          .addSimpleProgress(
+            userId: userId,
+            goalId: goalId,
+            delta: result.delta,
+            atDateUtc: result.atDateUtc,
+          );
     } catch (e) {
       if (!context.mounted) {
         return;
@@ -721,12 +734,13 @@ class GoalDetailScreen extends ConsumerWidget {
   Future<void> _editItem({
     required BuildContext context,
     required WidgetRef ref,
-    required String goalId,
+    required Goal goal,
     required GoalItem item,
   }) async {
     final draft = await _showGoalItemFormSheet(
       context: context,
       existing: item,
+      parentUnitLabel: _goalUnitLabel(goal),
     );
     if (draft == null) {
       return;
@@ -737,7 +751,7 @@ class GoalDetailScreen extends ConsumerWidget {
           .read(goalRepositoryProvider)
           .updateItem(
             userId: userId,
-            goalId: goalId,
+            goalId: goal.id,
             item: item.copyWith(
               name: draft.name,
               totalUnits: draft.totalUnits,
@@ -1869,6 +1883,7 @@ class _GoalFormDraft {
     required this.startDateUtc,
     required this.deadlineUtc,
     required this.isSimpleGoal,
+    this.initialCompletedValue = 0,
   });
 
   final String title;
@@ -1878,6 +1893,7 @@ class _GoalFormDraft {
   final DateTime startDateUtc;
   final DateTime? deadlineUtc;
   final bool isSimpleGoal;
+  final double initialCompletedValue;
 }
 
 class _GoalItemFormDraft {
@@ -1910,12 +1926,16 @@ Future<_GoalFormDraft?> _showGoalFormSheet({
 Future<_GoalItemFormDraft?> _showGoalItemFormSheet({
   required BuildContext context,
   GoalItem? existing,
+  String? parentUnitLabel,
 }) {
   return showModalBottomSheet<_GoalItemFormDraft>(
     context: context,
     isScrollControlled: true,
     builder: (context) {
-      return _GoalItemFormSheet(existing: existing);
+      return _GoalItemFormSheet(
+        existing: existing,
+        parentUnitLabel: parentUnitLabel,
+      );
     },
   );
 }
@@ -1964,41 +1984,151 @@ Future<double?> _showProgressUpdateDialog({
   );
 }
 
-Future<double?> _showAddProgressDialog({required BuildContext context}) {
-  final controller = TextEditingController();
+class _ProgressDialogResult {
+  const _ProgressDialogResult({required this.delta, this.atDateUtc});
+  final double delta;
+  final DateTime? atDateUtc;
+}
 
-  return showDialog<double>(
+Future<_ProgressDialogResult?> _showAddProgressDialog({
+  required BuildContext context,
+}) {
+  return showDialog<_ProgressDialogResult>(
     context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Add Progress'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Progress amount',
-            hintText: 'e.g. 500',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final parsed = double.tryParse(controller.text.trim());
-              if (parsed == null || parsed <= 0) {
-                return;
-              }
-              Navigator.of(context).pop(parsed);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      );
-    },
+    builder: (context) => const _AddProgressDialog(),
   );
+}
+
+class _AddProgressDialog extends StatefulWidget {
+  const _AddProgressDialog();
+
+  @override
+  State<_AddProgressDialog> createState() => _AddProgressDialogState();
+}
+
+class _AddProgressDialogState extends State<_AddProgressDialog> {
+  final _controller = TextEditingController();
+  bool _showDatePicker = false;
+  DateTime? _selectedDate;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Progress'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Progress amount',
+              hintText: 'e.g. 500',
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Hidden advanced option — extra step to discourage routine use.
+          GestureDetector(
+            onTap: () => setState(() => _showDatePicker = !_showDatePicker),
+            child: Row(
+              children: [
+                Icon(
+                  _showDatePicker ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Log for a different date',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_showDatePicker) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _selectedDate == null
+                        ? 'No date selected (uses today)'
+                        : DateFormat(
+                            'dd MMM yyyy',
+                          ).format(_selectedDate!.toLocal()),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final now = DateTime.now();
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate:
+                          _selectedDate?.toLocal() ??
+                          now.subtract(const Duration(days: 1)),
+                      firstDate: now.subtract(const Duration(days: 365)),
+                      lastDate: now.subtract(const Duration(days: 1)),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        // Store as local date so the heatmap key matches the
+                        // user's calendar day, not UTC.
+                        _selectedDate = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                        );
+                      });
+                    }
+                  },
+                  child: const Text('Pick date'),
+                ),
+                if (_selectedDate != null)
+                  IconButton(
+                    onPressed: () => setState(() => _selectedDate = null),
+                    icon: const Icon(Icons.close, size: 16),
+                    tooltip: 'Clear date',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final parsed = double.tryParse(_controller.text.trim());
+            if (parsed == null || parsed <= 0) return;
+            Navigator.of(context).pop(
+              _ProgressDialogResult(delta: parsed, atDateUtc: _selectedDate),
+            );
+          },
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
 }
 
 // ── Sample Goal Templates ─────────────────────────────────────────────────────
@@ -2079,6 +2209,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _targetController;
   late final TextEditingController _customUnitController;
+  late final TextEditingController _initialController;
 
   late GoalUnitType _unitType;
   late bool _isSimpleGoal;
@@ -2096,6 +2227,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
     _customUnitController = TextEditingController(
       text: existing?.customUnitLabel ?? '',
     );
+    _initialController = TextEditingController();
     _unitType = existing?.unitType ?? GoalUnitType.min;
     _isSimpleGoal = existing?.isSimpleGoal ?? false;
     _startDateUtc = existing?.startDateUtc ?? DateTime.now().toUtc();
@@ -2122,6 +2254,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
     _titleController.dispose();
     _targetController.dispose();
     _customUnitController.dispose();
+    _initialController.dispose();
     super.dispose();
   }
 
@@ -2154,7 +2287,7 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _kSampleGoalTemplates.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    separatorBuilder: (context, i) => const SizedBox(width: 8),
                     itemBuilder: (context, i) {
                       final t = _kSampleGoalTemplates[i];
                       return ActionChip(
@@ -2257,6 +2390,30 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
+              if (_isSimpleGoal && widget.existing == null) ...[
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _initialController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Initial progress (optional)',
+                    hintText: '0',
+                    helperText:
+                        'Already have some progress? Enter it here — it won\'t appear on your heatmap.',
+                    helperMaxLines: 2,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    final parsed = double.tryParse(value.trim());
+                    if (parsed == null || parsed < 0) {
+                      return 'Enter a valid number (0 or more)';
+                    }
+                    return null;
+                  },
+                ),
+              ],
               const SizedBox(height: 4),
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -2442,6 +2599,12 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
     final customUnit = _unitType == GoalUnitType.custom
         ? _customUnitController.text.trim()
         : null;
+    final initialRaw = _initialController.text.trim();
+    final initialCompletedValue =
+        (initialRaw.isEmpty ? 0.0 : (double.tryParse(initialRaw) ?? 0.0)).clamp(
+          0.0,
+          targetValue,
+        );
 
     Navigator.of(context).pop(
       _GoalFormDraft(
@@ -2454,15 +2617,17 @@ class _GoalFormSheetState extends State<_GoalFormSheet> {
         startDateUtc: _startDateUtc,
         deadlineUtc: _deadlineUtc,
         isSimpleGoal: _isSimpleGoal,
+        initialCompletedValue: initialCompletedValue,
       ),
     );
   }
 }
 
 class _GoalItemFormSheet extends StatefulWidget {
-  const _GoalItemFormSheet({this.existing});
+  const _GoalItemFormSheet({this.existing, this.parentUnitLabel});
 
   final GoalItem? existing;
+  final String? parentUnitLabel;
 
   @override
   State<_GoalItemFormSheet> createState() => _GoalItemFormSheetState();
@@ -2532,7 +2697,11 @@ class _GoalItemFormSheetState extends State<_GoalItemFormSheet> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: const InputDecoration(labelText: 'Total units'),
+                decoration: InputDecoration(
+                  labelText: widget.parentUnitLabel != null
+                      ? 'Total (${widget.parentUnitLabel})'
+                      : 'Total units',
+                ),
                 validator: (value) {
                   final parsed = double.tryParse((value ?? '').trim());
                   if (parsed == null || parsed <= 0) {
@@ -2547,7 +2716,11 @@ class _GoalItemFormSheetState extends State<_GoalItemFormSheet> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: const InputDecoration(labelText: 'Completed units'),
+                decoration: InputDecoration(
+                  labelText: widget.parentUnitLabel != null
+                      ? 'Completed so far (${widget.parentUnitLabel})'
+                      : 'Completed units',
+                ),
                 validator: (value) {
                   final parsed = double.tryParse((value ?? '').trim());
                   if (parsed == null || parsed < 0) {

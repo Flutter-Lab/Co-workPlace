@@ -1,0 +1,7 @@
+1. Heatmap showing behind date from input date. Find this problem and suggest solutions.
+
+2. Some Goal has Target Unit but It's Subgoals doesn't have actual target unit. Let's say:
+My Goal is 'Read 5000 minute', My Subgoals are Books/Newspaper etc. I can't count actual target time to read the book. I can Only input how much I read.
+How to handle this situation in my app? Give me some ideas
+
+- 

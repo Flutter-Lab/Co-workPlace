@@ -7,6 +7,56 @@ class ScoreService {
 
   final FirebaseFirestore _firestore;
 
+  // ─── Transaction log helpers ──────────────────────────────────────────────
+
+  CollectionReference<Map<String, dynamic>> _txnCol(String userId) =>
+      _firestore.collection('users/$userId/pointTxns');
+
+  // Write a point-transaction log entry inside an existing Firestore tx.
+  void _addPointTxnInTx(
+    Transaction tx,
+    String userId,
+    int delta,
+    String reason,
+  ) {
+    final ref = _txnCol(userId).doc();
+    tx.set(ref, {
+      'delta': delta,
+      'reason': reason,
+      'createdAtUtc': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Stream all-time points for a user, live.
+  Stream<int> watchPointsForUser(String userId) {
+    return _firestore
+        .doc('users/$userId/scores/${alltimePeriodId()}')
+        .snapshots()
+        .map((snap) => (snap.data()?['points'] ?? 0) as int);
+  }
+
+  // Stream transaction log for a user (newest first, up to [limit]).
+  Stream<List<Map<String, dynamic>>> watchTransactionLog(
+    String userId, {
+    int limit = 200,
+  }) {
+    return _txnCol(userId)
+        .orderBy('createdAtUtc', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs.map((d) {
+            final data = d.data();
+            return {
+              'id': d.id,
+              'delta': (data['delta'] ?? 0) as int,
+              'reason': (data['reason'] ?? '') as String,
+              'createdAtUtc': data['createdAtUtc'],
+            };
+          }).toList(),
+        );
+  }
+
   // Period id helpers
   String weekPeriodId(DateTime utc) {
     final weekYear = utc.toUtc().year;
@@ -71,6 +121,7 @@ class ScoreService {
           'points': FieldValue.increment(1),
           'updatedAtUtc': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+        _addPointTxnInTx(tx, userId, 1, 'activity_hour');
       });
     } catch (e, st) {
       debugPrint('awardActivityHour failed: $e\n$st');
@@ -112,6 +163,7 @@ class ScoreService {
             'updatedAtUtc': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         }
+        _addPointTxnInTx(tx, userId, 2, 'app_open');
       });
     } catch (e, st) {
       debugPrint('awardAppOpen failed: $e\n$st');
@@ -203,6 +255,7 @@ class ScoreService {
             'points': FieldValue.increment(1),
             'updatedAtUtc': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
+          _addPointTxnInTx(tx, ownerId, 1, 'vote');
         });
 
         // success
@@ -301,6 +354,7 @@ class ScoreService {
         'points': FieldValue.increment(-1),
         'updatedAtUtc': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      _addPointTxnInTx(tx, ownerId, -1, 'vote_revoked');
     });
   }
 
@@ -334,6 +388,7 @@ class ScoreService {
         'points': FieldValue.increment(points),
         'updatedAtUtc': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      _addPointTxnInTx(tx, ownerId, points, 'task_create');
     });
   }
 
@@ -364,6 +419,41 @@ class ScoreService {
         'points': FieldValue.increment(points),
         'updatedAtUtc': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      _addPointTxnInTx(tx, userId, points, 'task_done');
+    });
+  }
+
+  // Revoke points when a task completion is undone.
+  Future<void> revokeCompletion({
+    required String userId,
+    int points = 3,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final weekId = weekPeriodId(now);
+    final monthId = monthPeriodId(now);
+    final allId = alltimePeriodId();
+
+    await _firestore.runTransaction((tx) async {
+      final weekRef = _firestore.doc('users/$userId/scores/$weekId');
+      final monthRef = _firestore.doc('users/$userId/scores/$monthId');
+      final allRef = _firestore.doc('users/$userId/scores/$allId');
+
+      tx.set(weekRef, {
+        'periodId': weekId,
+        'points': FieldValue.increment(-points),
+        'updatedAtUtc': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      tx.set(monthRef, {
+        'periodId': monthId,
+        'points': FieldValue.increment(-points),
+        'updatedAtUtc': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      tx.set(allRef, {
+        'periodId': allId,
+        'points': FieldValue.increment(-points),
+        'updatedAtUtc': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      _addPointTxnInTx(tx, userId, -points, 'task_undo');
     });
   }
 
@@ -403,6 +493,7 @@ class ScoreService {
             'updatedAtUtc': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         }
+        _addPointTxnInTx(tx, userId, 1, 'goal_update');
       });
     } catch (e, st) {
       debugPrint('awardGoalUpdate failed: $e\n$st');

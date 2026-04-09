@@ -486,11 +486,24 @@ class _PersonalProfileScreenState extends ConsumerState<PersonalProfileScreen> {
   }) async {
     try {
       final repository = ref.read(completionRepositoryProvider);
+      // Check previous status before deleting so we can revoke points if needed.
+      final previous = await repository.getCompletionForTaskDate(
+        taskId: taskId,
+        userId: userId,
+        localDateKey: localDateKey,
+      );
       await repository.deleteCompletion(
         taskId: taskId,
         userId: userId,
         localDateKey: localDateKey,
       );
+      if (previous?.status == CompletionStatus.done) {
+        try {
+          await ScoreService().revokeCompletion(userId: userId);
+        } catch (_) {
+          // Best-effort; don't block UI.
+        }
+      }
       _showSnack('Marked as pending.');
     } catch (error) {
       _showSnack('Failed to update: $error');
@@ -1494,27 +1507,14 @@ class _TaskDraft {
 
 // ─── Points Card ─────────────────────────────────────────────────────────────
 
-class _PointsCard extends StatefulWidget {
+class _PointsCard extends StatelessWidget {
   const _PointsCard({required this.userId});
   final String userId;
 
   @override
-  State<_PointsCard> createState() => _PointsCardState();
-}
-
-class _PointsCardState extends State<_PointsCard> {
-  late final Future<int> _pointsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _pointsFuture = ScoreService().getPointsForUser(widget.userId);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<int>(
-      future: _pointsFuture,
+    return StreamBuilder<int>(
+      stream: ScoreService().watchPointsForUser(userId),
       builder: (context, snap) {
         final points = snap.data ?? 0;
         return Card(
@@ -1523,7 +1523,7 @@ class _PointsCardState extends State<_PointsCard> {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => PointsLogScreen(userId: widget.userId),
+                  builder: (_) => PointsLogScreen(userId: userId),
                 ),
               );
             },
