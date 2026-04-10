@@ -296,6 +296,7 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
             totalUnits: draft.totalUnits,
             completedUnits: draft.completedUnits,
             note: draft.note,
+            completedDate: draft.completedDate,
           );
     } catch (e) {
       if (!context.mounted) {
@@ -345,7 +346,7 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
     final text =
         '🎯 I\'m working on: ${goal.title}\n'
         '$progress% done — ${_formatNumber(metrics.completed)} / ${_formatNumber(metrics.target)} $unit$deadline\n\n'
-        'Join me on Coworkplace to track your goals and tasks together! 🚀';
+        'Join me on TaskArena to track your goals and tasks together! 🚀';
     if (kIsWeb) {
       Clipboard.setData(ClipboardData(text: text));
       ScaffoldMessenger.of(context).showSnackBar(
@@ -461,6 +462,18 @@ class GoalDetailScreen extends ConsumerWidget {
                     _GoalProgressLogCard(
                       dailyProgress: dailyProgress,
                       unitLabel: _goalUnitLabel(goal),
+                      bootstrapAmount: () {
+                        final logged = dailyProgress.values.fold(
+                          0.0,
+                          (a, b) => a + b,
+                        );
+                        final gap = goal.completedValue - logged;
+                        return gap > 0.001 ? gap : 0.0;
+                      }(),
+                      onDeleteEntry: (date) =>
+                          _deleteProgressEntry(context, ref, goal.id, date),
+                      onEditEntry: (date, cur) =>
+                          _editProgressEntry(context, ref, goal.id, date, cur),
                     ),
                   ],
                 );
@@ -489,6 +502,23 @@ class GoalDetailScreen extends ConsumerWidget {
                       _GoalProgressLogCard(
                         dailyProgress: dailyProgress,
                         unitLabel: _goalUnitLabel(goal),
+                        bootstrapAmount: () {
+                          final logged = dailyProgress.values.fold(
+                            0.0,
+                            (a, b) => a + b,
+                          );
+                          final gap = goal.completedValue - logged;
+                          return gap > 0.001 ? gap : 0.0;
+                        }(),
+                        onDeleteEntry: (date) =>
+                            _deleteProgressEntry(context, ref, goal.id, date),
+                        onEditEntry: (date, cur) => _editProgressEntry(
+                          context,
+                          ref,
+                          goal.id,
+                          date,
+                          cur,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -691,6 +721,7 @@ class GoalDetailScreen extends ConsumerWidget {
             totalUnits: draft.totalUnits,
             completedUnits: draft.completedUnits,
             note: draft.note,
+            completedDate: draft.completedDate,
           );
     } catch (e) {
       if (!context.mounted) {
@@ -776,6 +807,26 @@ class GoalDetailScreen extends ConsumerWidget {
     required String goalId,
     required String itemId,
   }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete item?'),
+        content: const Text(
+          'This will remove the item and subtract its progress from the goal.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     try {
       await ref
           .read(goalRepositoryProvider)
@@ -787,6 +838,78 @@ class GoalDetailScreen extends ConsumerWidget {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not delete item: $e')));
+    }
+  }
+
+  Future<void> _deleteProgressEntry(
+    BuildContext context,
+    WidgetRef ref,
+    String goalId,
+    DateTime dateLocal,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete entry?'),
+        content: Text(
+          'Remove progress logged on '
+          '${DateFormat('dd MMM yyyy').format(dateLocal)}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref
+          .read(goalRepositoryProvider)
+          .deleteProgressEntry(
+            userId: userId,
+            goalId: goalId,
+            dateLocal: dateLocal,
+          );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not delete entry: $e')));
+    }
+  }
+
+  Future<void> _editProgressEntry(
+    BuildContext context,
+    WidgetRef ref,
+    String goalId,
+    DateTime dateLocal,
+    double currentValue,
+  ) async {
+    final newValue = await _showEditProgressEntryDialog(
+      context: context,
+      currentValue: currentValue,
+    );
+    if (newValue == null) return;
+    try {
+      await ref
+          .read(goalRepositoryProvider)
+          .editProgressEntry(
+            userId: userId,
+            goalId: goalId,
+            dateLocal: dateLocal,
+            newValue: newValue,
+          );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update entry: $e')));
     }
   }
 
@@ -1325,18 +1448,16 @@ class _StreakInfo {
   final int longest;
 }
 
-_StreakInfo _calculateStreak(
-  Map<DateTime, double> dailyProgress,
-  DateTime nowUtc,
-) {
+_StreakInfo _calculateStreak(Map<DateTime, double> dailyProgress) {
   final normalized = <DateTime, double>{};
   dailyProgress.forEach((day, value) {
-    final key = DateTime.utc(day.year, day.month, day.day);
+    final key = DateTime(day.year, day.month, day.day); // local calendar day
     normalized[key] = value;
   });
 
   int current = 0;
-  var cursor = DateTime.utc(nowUtc.year, nowUtc.month, nowUtc.day);
+  final now = DateTime.now();
+  var cursor = DateTime(now.year, now.month, now.day); // local today
   while ((normalized[cursor] ?? 0) > 0) {
     current++;
     cursor = cursor.subtract(const Duration(days: 1));
@@ -1423,10 +1544,11 @@ class _GoalHeatmapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final endDate = DateTime.now().toUtc();
+    final endDate =
+        DateTime.now(); // local — matches local date keys in dailyProgress
     const weeks = 16;
     const daysPerWeek = 7;
-    final startDate = DateTime.utc(
+    final startDate = DateTime(
       endDate.year,
       endDate.month,
       endDate.day,
@@ -1436,7 +1558,11 @@ class _GoalHeatmapCard extends StatelessWidget {
     final days = <DateTime>[];
     for (int i = 0; i < weeks * daysPerWeek; i++) {
       final day = startDate.add(Duration(days: i));
-      final key = DateTime.utc(day.year, day.month, day.day);
+      final key = DateTime(
+        day.year,
+        day.month,
+        day.day,
+      ); // local, must match parsed keys
       days.add(key);
       values.add(dailyProgress[key] ?? 0);
     }
@@ -1445,7 +1571,7 @@ class _GoalHeatmapCard extends StatelessWidget {
       weeks,
       (index) => startDate.add(Duration(days: index * daysPerWeek)),
     );
-    final streak = _calculateStreak(dailyProgress, endDate);
+    final streak = _calculateStreak(dailyProgress);
 
     final maxValue = values.fold<double>(0, (prev, v) => v > prev ? v : prev);
 
@@ -1902,12 +2028,14 @@ class _GoalItemFormDraft {
     required this.totalUnits,
     required this.completedUnits,
     required this.note,
+    this.completedDate,
   });
 
   final String name;
   final double totalUnits;
   final double completedUnits;
   final String? note;
+  final DateTime? completedDate;
 }
 
 Future<_GoalFormDraft?> _showGoalFormSheet({
@@ -1996,6 +2124,41 @@ Future<_ProgressDialogResult?> _showAddProgressDialog({
   return showDialog<_ProgressDialogResult>(
     context: context,
     builder: (context) => const _AddProgressDialog(),
+  );
+}
+
+Future<double?> _showEditProgressEntryDialog({
+  required BuildContext context,
+  required double currentValue,
+}) {
+  final controller = TextEditingController(
+    text: currentValue.toStringAsFixed(currentValue % 1 == 0 ? 0 : 1),
+  );
+  return showDialog<double>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Edit Progress Entry'),
+      content: TextField(
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        autofocus: true,
+        decoration: const InputDecoration(labelText: 'Amount'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final parsed = double.tryParse(controller.text.trim());
+            if (parsed == null || parsed < 0) return;
+            Navigator.of(context).pop(parsed);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
   );
 }
 
@@ -2639,6 +2802,7 @@ class _GoalItemFormSheetState extends State<_GoalItemFormSheet> {
   late final TextEditingController _totalController;
   late final TextEditingController _completedController;
   late final TextEditingController _noteController;
+  DateTime? _completedDate;
 
   @override
   void initState() {
@@ -2729,6 +2893,38 @@ class _GoalItemFormSheetState extends State<_GoalItemFormSheet> {
                   return null;
                 },
               ),
+              if (widget.existing == null) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _completedDate == null
+                            ? 'No date (shown as "No date" in log)'
+                            : DateFormat('dd MMM yyyy').format(_completedDate!),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _pickCompletedDate,
+                      child: Text(
+                        _completedDate == null ? 'Attach date' : 'Change',
+                      ),
+                    ),
+                    if (_completedDate != null)
+                      IconButton(
+                        onPressed: () => setState(() => _completedDate = null),
+                        icon: const Icon(Icons.close, size: 16),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 10),
               TextFormField(
                 controller: _noteController,
@@ -2754,6 +2950,21 @@ class _GoalItemFormSheetState extends State<_GoalItemFormSheet> {
     );
   }
 
+  Future<void> _pickCompletedDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _completedDate ?? now,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() {
+        _completedDate = DateTime(picked.year, picked.month, picked.day);
+      });
+    }
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -2770,6 +2981,7 @@ class _GoalItemFormSheetState extends State<_GoalItemFormSheet> {
         note: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),
+        completedDate: widget.existing == null ? _completedDate : null,
       ),
     );
   }
@@ -3094,14 +3306,22 @@ class _GoalProgressLogCard extends StatelessWidget {
   const _GoalProgressLogCard({
     required this.dailyProgress,
     required this.unitLabel,
+    this.bootstrapAmount = 0,
+    this.onDeleteEntry,
+    this.onEditEntry,
   });
 
   final Map<DateTime, double> dailyProgress;
   final String unitLabel;
+  final double bootstrapAmount;
+  final Future<void> Function(DateTime date)? onDeleteEntry;
+  final Future<void> Function(DateTime date, double currentValue)? onEditEntry;
 
   @override
   Widget build(BuildContext context) {
-    if (dailyProgress.isEmpty) return const SizedBox.shrink();
+    if (dailyProgress.isEmpty && bootstrapAmount <= 0) {
+      return const SizedBox.shrink();
+    }
 
     final sortedEntries = dailyProgress.entries.toList()
       ..sort((a, b) => b.key.compareTo(a.key));
@@ -3121,7 +3341,7 @@ class _GoalProgressLogCard extends StatelessWidget {
             const SizedBox(height: 10),
             for (final entry in sortedEntries.take(30)) ...[
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 2),
                 child: Row(
                   children: [
                     Text(
@@ -3135,6 +3355,33 @@ class _GoalProgressLogCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (onEditEntry != null) ...[
+                      const SizedBox(width: 2),
+                      SizedBox(
+                        width: 30,
+                        height: 30,
+                        child: IconButton(
+                          onPressed: () => onEditEntry!(entry.key, entry.value),
+                          icon: const Icon(Icons.edit_outlined, size: 14),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'Edit entry',
+                        ),
+                      ),
+                    ],
+                    if (onDeleteEntry != null) ...[
+                      SizedBox(
+                        width: 30,
+                        height: 30,
+                        child: IconButton(
+                          onPressed: () => onDeleteEntry!(entry.key),
+                          icon: const Icon(Icons.delete_outline, size: 14),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'Delete entry',
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -3149,6 +3396,42 @@ class _GoalProgressLogCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
+            if (bootstrapAmount > 0) ...[
+              if (sortedEntries.isNotEmpty) const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'No date',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '+${_formatNumber(bootstrapAmount)} $unitLabel',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

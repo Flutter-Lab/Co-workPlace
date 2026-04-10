@@ -4,4 +4,6 @@
 My Goal is 'Read 5000 minute', My Subgoals are Books/Newspaper etc. I can't count actual target time to read the book. I can Only input how much I read.
 How to handle this situation in my app? Give me some ideas
 
-- 
+-- Forget Password / Password Reset
+-- Quote Banner / Hide Option / Messege "You can Enable from Settings"
+-- 

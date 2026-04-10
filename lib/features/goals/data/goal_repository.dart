@@ -271,6 +271,8 @@ class GoalRepository {
     required double totalUnits,
     required double completedUnits,
     String? note,
+    DateTime?
+    completedDate, // local date for initial progress; null = no heatmap entry
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -325,14 +327,19 @@ class GoalRepository {
       );
 
       tx.set(itemRef, created.toMap());
-      // Don't update dailyProgressByDate on item creation: initial completedUnits
-      // represents pre-existing progress the user is entering to bootstrap tracking,
-      // not work done today.
-      tx.update(goalRef, {
+      final goalUpdate = <String, dynamic>{
         'completedValue': max(0.0, currentCompleted + normalizedCompleted),
         'itemCount': max(0, currentItemCount + 1),
         'updatedAtUtc': nowUtc.toIso8601String(),
-      });
+      };
+      if (completedDate != null && normalizedCompleted > 0) {
+        goalUpdate['dailyProgressByDate'] = _nextDailyProgressMap(
+          goalData: goalData,
+          dateLocal: completedDate,
+          delta: normalizedCompleted,
+        );
+      }
+      tx.update(goalRef, goalUpdate);
     });
 
     return created;
@@ -510,6 +517,78 @@ class GoalRepository {
         'itemCount': max(0, currentItemCount - 1),
         'updatedAtUtc': nowUtc.toIso8601String(),
         'dailyProgressByDate': nextDailyProgress,
+      });
+    });
+  }
+
+  Future<void> deleteProgressEntry({
+    required String userId,
+    required String goalId,
+    required DateTime dateLocal,
+  }) async {
+    final goalRef = _goals(userId).doc(goalId);
+    final nowUtc = DateTime.now().toUtc();
+    await _firestore.runTransaction((tx) async {
+      final goalSnap = await tx.get(goalRef);
+      if (!goalSnap.exists) return;
+      final goalData = goalSnap.data() ?? <String, dynamic>{};
+
+      final key = _dateKey(dateLocal);
+      final rawMap = goalData['dailyProgressByDate'];
+      final existing = <String, double>{};
+      if (rawMap is Map) {
+        rawMap.forEach((k, v) {
+          if (k is String) existing[k] = (v as num?)?.toDouble() ?? 0;
+        });
+      }
+      final removed = existing.remove(key) ?? 0;
+      final currentCompleted =
+          (goalData['completedValue'] as num?)?.toDouble() ?? 0;
+      tx.update(goalRef, {
+        'completedValue': max(0.0, currentCompleted - removed),
+        'updatedAtUtc': nowUtc.toIso8601String(),
+        'dailyProgressByDate': existing,
+      });
+    });
+  }
+
+  Future<void> editProgressEntry({
+    required String userId,
+    required String goalId,
+    required DateTime dateLocal,
+    required double newValue,
+  }) async {
+    if (newValue < 0) {
+      throw ArgumentError.value(newValue, 'newValue', 'Value must be >= 0.');
+    }
+    final goalRef = _goals(userId).doc(goalId);
+    final nowUtc = DateTime.now().toUtc();
+    await _firestore.runTransaction((tx) async {
+      final goalSnap = await tx.get(goalRef);
+      if (!goalSnap.exists) return;
+      final goalData = goalSnap.data() ?? <String, dynamic>{};
+
+      final key = _dateKey(dateLocal);
+      final rawMap = goalData['dailyProgressByDate'];
+      final existing = <String, double>{};
+      if (rawMap is Map) {
+        rawMap.forEach((k, v) {
+          if (k is String) existing[k] = (v as num?)?.toDouble() ?? 0;
+        });
+      }
+      final oldValue = existing[key] ?? 0;
+      final delta = newValue - oldValue;
+      if (newValue <= 0) {
+        existing.remove(key);
+      } else {
+        existing[key] = newValue;
+      }
+      final currentCompleted =
+          (goalData['completedValue'] as num?)?.toDouble() ?? 0;
+      tx.update(goalRef, {
+        'completedValue': max(0.0, currentCompleted + delta),
+        'updatedAtUtc': nowUtc.toIso8601String(),
+        'dailyProgressByDate': existing,
       });
     });
   }

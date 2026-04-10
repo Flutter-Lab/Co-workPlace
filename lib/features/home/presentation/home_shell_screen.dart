@@ -16,7 +16,7 @@ class HomeShellScreen extends ConsumerStatefulWidget {
 class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
   int _index = 0;
 
-  static const _titles = ['Coworkplace', 'Goals', 'Friends', 'Profile'];
+  static const _titles = ['TaskArena', 'Goals', 'Friends', 'Profile'];
 
   @override
   Widget build(BuildContext context) {

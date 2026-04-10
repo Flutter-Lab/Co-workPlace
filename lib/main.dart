@@ -12,5 +12,5 @@ Future<void> main() async {
   await Hive.openBox<int>('app_prefs');
   tz_data.initializeTimeZones();
   await NotificationService.initialize();
-  runApp(const ProviderScope(child: CoworkplaceApp()));
+  runApp(const ProviderScope(child: TaskArenaApp()));
 }

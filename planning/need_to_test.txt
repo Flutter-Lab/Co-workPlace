@@ -1,3 +1,10 @@
 Share Goal option is only Copying a Text now. Plan on How to share entire Goal with a Link. And Anybody can see the Goal with that link.
 Show a Nice animation when User gets points.
 Add 1 Point When User Update/Create Goal (Once in a hour)
+  1. Point Log Screen will show Points add time and reason (transaction style). And every update (Transaction) show the Total points. It's kind of Banking transaction style. Suggest me if you have better idea.
+  2. Completing task Adding point but Undone/Undo complete is not subtracting points. Fix this.
+  3. Point value is not updating instantly in Point card when I see the animation of point add.
+  4. First time input will not have any date and will not show in the heatmap. Let's say I'm currently Finished 20% Of my goal and now Want to track on this app. Then I will input 20% at the start of Goal track but I don't want to see it as todays completion.
+  5. Add option to input Goal completion in previous date but do not incourage user. Add extra step to find the option.
+
+  Add an optional “initial completed units” input to the Simple Goal creation flow so users can bootstrap progress at creation time, without counting that entry as today’s heatmap progress.

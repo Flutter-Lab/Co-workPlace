@@ -17,8 +17,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class CoworkplaceApp extends ConsumerWidget {
-  const CoworkplaceApp({super.key});
+class TaskArenaApp extends ConsumerWidget {
+  const TaskArenaApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,7 +48,7 @@ class _SessionGate extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
-      title: 'Coworkplace',
+      title: 'TaskArena',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

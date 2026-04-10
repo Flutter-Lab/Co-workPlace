@@ -34,7 +34,7 @@ void main() {
         ),
         themeModeProvider.overrideWith(() => _StubThemeModeNotifier()),
       ],
-      child: const CoworkplaceApp(),
+      child: const TaskArenaApp(),
     );
   }
 
