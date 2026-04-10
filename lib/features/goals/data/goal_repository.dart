@@ -595,6 +595,61 @@ class GoalRepository {
     });
   }
 
+  /// Removes the "no date" bootstrap progress from a goal.
+  ///
+  /// The no-date amount is the gap: `completedValue − sum(dailyProgressByDate)`.
+  /// [bootstrapAmount] must be that computed gap so we subtract it exactly.
+  Future<void> deleteNoDateProgress({
+    required String userId,
+    required String goalId,
+    required double bootstrapAmount,
+  }) async {
+    if (bootstrapAmount <= 0) return;
+    final goalRef = _goals(userId).doc(goalId);
+    final nowUtc = DateTime.now().toUtc();
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(goalRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? <String, dynamic>{};
+      final currentCompleted =
+          (data['completedValue'] as num?)?.toDouble() ?? 0;
+      tx.update(goalRef, {
+        'completedValue': max(0.0, currentCompleted - bootstrapAmount),
+        'updatedAtUtc': nowUtc.toIso8601String(),
+      });
+    });
+  }
+
+  /// Replaces the "no date" bootstrap progress with [newBootstrapAmount].
+  Future<void> editNoDateProgress({
+    required String userId,
+    required String goalId,
+    required double oldBootstrapAmount,
+    required double newBootstrapAmount,
+  }) async {
+    if (newBootstrapAmount < 0) {
+      throw ArgumentError.value(
+        newBootstrapAmount,
+        'newBootstrapAmount',
+        'Must be >= 0.',
+      );
+    }
+    final goalRef = _goals(userId).doc(goalId);
+    final nowUtc = DateTime.now().toUtc();
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(goalRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? <String, dynamic>{};
+      final currentCompleted =
+          (data['completedValue'] as num?)?.toDouble() ?? 0;
+      final delta = newBootstrapAmount - oldBootstrapAmount;
+      tx.update(goalRef, {
+        'completedValue': max(0.0, currentCompleted + delta),
+        'updatedAtUtc': nowUtc.toIso8601String(),
+      });
+    });
+  }
+
   Map<String, double> _nextDailyProgressMap({
     required Map<String, dynamic> goalData,
     required DateTime dateLocal, // local calendar date to key progress against

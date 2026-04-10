@@ -4,6 +4,10 @@
   <dict>
     <key>NSUserNotificationUsageDescription</key>
     <string>We send you a daily reminder to complete your tasks before the day resets at midnight.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>TaskArena uses your camera to update your profile photo.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>TaskArena accesses your photo library to let you choose a profile photo.</string>
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
     <key>CFBundleDevelopmentRegion</key>
@@ -68,5 +72,7 @@
       <string>UIInterfaceOrientationLandscapeLeft</string>
       <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
+    <key>UIStatusBarHidden</key>
+    <false/>
   </dict>
 </plist>

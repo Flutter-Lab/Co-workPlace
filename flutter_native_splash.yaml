@@ -1,0 +1,24 @@
+flutter_native_splash:
+  # White background to match the text logo
+  color: "#FFFFFF"
+  color_dark: "#FFFFFF"
+
+  # Text logo centered on splash screen
+  image: assets/images/text_logo.png
+  image_dark: assets/images/text_logo.png
+
+  # Splash fill mode: keep image at natural size
+  fullscreen: false
+
+  # iOS: use the new storyboard-based launch screen
+  android_12:
+    # Android 12+ unified splash (uses adaptive icon)
+    color: "#FFFFFF"
+    color_dark: "#FFFFFF"
+    image: assets/images/text_logo.png
+    image_dark: assets/images/text_logo.png
+
+  # Show the native splash until Flutter draws its first frame
+  android_gravity: center
+  ios_content_mode: center
+  web_image_mode: center

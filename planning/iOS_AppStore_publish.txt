@@ -1,0 +1,26 @@
+# iOS App Store Pre-Release Checklist
+
+## Required (will be rejected without)
+- [ ] App Store Connect account — enroll in Apple Developer Program ($99/yr)
+- [ ] Bundle ID — set a unique reverse-domain ID in Xcode → Runner → Signing & Capabilities (for example, `com.yourname.taskarena`)
+- [ ] Version & build number — `pubspec.yaml` shows `1.0.5+7`; ensure the build number is unique for each App Store upload
+- [ ] Signing certificate & provisioning profile — create a distribution certificate and App Store provisioning profile in Apple Developer portal
+- [ ] Privacy policy URL — required in App Store Connect; host on a webpage and link it in the app listing
+- [ ] Age rating questionnaire — complete in App Store Connect; anonymous social features may affect the rating
+- [ ] App screenshots — 6.7" iPhone 16 Pro Max screenshot is required; also provide 6.5" and 5.5" versions or use Xcode simulator captures
+
+## Strongly Recommended
+- [ ] App description & keywords — write a clear description and choose relevant keywords for productivity/task apps
+- [ ] Support URL — required in App Store Connect; can be a simple webpage or email contact page
+- [ ] Firebase Security Rules — review `firestore.rules` to ensure users cannot read/write other users' private data
+- [ ] Anonymous auth data retention — decide how long anonymous user data is kept and document the policy in your privacy statement
+- [ ] Notification permission text — use the correct iOS permission keys; avoid deprecated `NSUserNotificationUsageDescription` if not using legacy APIs
+- [ ] Real device testing — build an `.ipa` and install via TestFlight before submitting
+- [ ] iPad layout check — test on an iPad simulator if `Info.plist` declares iPad orientations
+- [ ] Notch / Dynamic Island safe areas — verify `SafeArea` is applied on iPhone 15 Pro / 16 Pro screens
+
+## Nice to Have
+- [ ] App Tracking Transparency — only needed if the app tracks users across apps or serves targeted ads
+- [ ] Accessibility review — run Accessibility Inspector and resolve basic issues before submission
+- [ ] Localization — add `CFBundleLocalizations` and translated strings if you plan to target non-English markets
+- [ ] Crash-free beta baseline — run a TestFlight beta build for at least a week to catch Firebase/Hive initialization issues and stability regressions

@@ -469,6 +469,29 @@ class GoalDetailScreen extends ConsumerWidget {
                           _deleteProgressEntry(context, ref, goal.id, date),
                       onEditEntry: (date, cur) =>
                           _editProgressEntry(context, ref, goal.id, date, cur),
+                      onDeleteNoDateEntry: () {
+                        final logged = dailyProgress.values.fold(
+                          0.0,
+                          (a, b) => a + b,
+                        );
+                        final gap = goal.completedValue - logged;
+                        if (gap > 0.001) {
+                          _deleteNoDateEntry(context, ref, goal.id, gap);
+                        }
+                      },
+                      onEditNoDateEntry: (cur) {
+                        final logged = dailyProgress.values.fold(
+                          0.0,
+                          (a, b) => a + b,
+                        );
+                        final gap = goal.completedValue - logged;
+                        _editNoDateEntry(
+                          context,
+                          ref,
+                          goal.id,
+                          gap > 0.001 ? gap : cur,
+                        );
+                      },
                     ),
                   ],
                 );
@@ -514,6 +537,29 @@ class GoalDetailScreen extends ConsumerWidget {
                           date,
                           cur,
                         ),
+                        onDeleteNoDateEntry: () {
+                          final logged = dailyProgress.values.fold(
+                            0.0,
+                            (a, b) => a + b,
+                          );
+                          final gap = goal.completedValue - logged;
+                          if (gap > 0.001) {
+                            _deleteNoDateEntry(context, ref, goal.id, gap);
+                          }
+                        },
+                        onEditNoDateEntry: (cur) {
+                          final logged = dailyProgress.values.fold(
+                            0.0,
+                            (a, b) => a + b,
+                          );
+                          final gap = goal.completedValue - logged;
+                          _editNoDateEntry(
+                            context,
+                            ref,
+                            goal.id,
+                            gap > 0.001 ? gap : cur,
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -900,6 +946,76 @@ class GoalDetailScreen extends ConsumerWidget {
             goalId: goalId,
             dateLocal: dateLocal,
             newValue: newValue,
+          );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update entry: $e')));
+    }
+  }
+
+  Future<void> _deleteNoDateEntry(
+    BuildContext context,
+    WidgetRef ref,
+    String goalId,
+    double bootstrapAmount,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete "No date" entry?'),
+        content: const Text(
+          'This will remove the undated progress amount from this goal.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref
+          .read(goalRepositoryProvider)
+          .deleteNoDateProgress(
+            userId: userId,
+            goalId: goalId,
+            bootstrapAmount: bootstrapAmount,
+          );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not delete entry: $e')));
+    }
+  }
+
+  Future<void> _editNoDateEntry(
+    BuildContext context,
+    WidgetRef ref,
+    String goalId,
+    double bootstrapAmount,
+  ) async {
+    final newValue = await _showEditProgressEntryDialog(
+      context: context,
+      currentValue: bootstrapAmount,
+    );
+    if (newValue == null) return;
+    try {
+      await ref
+          .read(goalRepositoryProvider)
+          .editNoDateProgress(
+            userId: userId,
+            goalId: goalId,
+            oldBootstrapAmount: bootstrapAmount,
+            newBootstrapAmount: newValue,
           );
     } catch (e) {
       if (!context.mounted) return;
@@ -3288,6 +3404,8 @@ class _GoalProgressLogCard extends StatelessWidget {
     this.bootstrapAmount = 0,
     this.onDeleteEntry,
     this.onEditEntry,
+    this.onDeleteNoDateEntry,
+    this.onEditNoDateEntry,
   });
 
   final Map<DateTime, double> dailyProgress;
@@ -3295,6 +3413,8 @@ class _GoalProgressLogCard extends StatelessWidget {
   final double bootstrapAmount;
   final Future<void> Function(DateTime date)? onDeleteEntry;
   final Future<void> Function(DateTime date, double currentValue)? onEditEntry;
+  final void Function()? onDeleteNoDateEntry;
+  final void Function(double currentValue)? onEditNoDateEntry;
 
   @override
   Widget build(BuildContext context) {
@@ -3334,33 +3454,41 @@ class _GoalProgressLogCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (onEditEntry != null) ...[
-                      const SizedBox(width: 2),
-                      SizedBox(
-                        width: 30,
-                        height: 30,
-                        child: IconButton(
-                          onPressed: () => onEditEntry!(entry.key, entry.value),
-                          icon: const Icon(Icons.edit_outlined, size: 14),
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                          tooltip: 'Edit entry',
-                        ),
+                    if (onEditEntry != null || onDeleteEntry != null)
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        padding: EdgeInsets.zero,
+                        tooltip: 'Options',
+                        itemBuilder: (context) => [
+                          if (onEditEntry != null)
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                leading: Icon(Icons.edit_outlined),
+                                title: Text('Edit'),
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                              ),
+                            ),
+                          if (onDeleteEntry != null)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                leading: Icon(Icons.delete_outline),
+                                title: Text('Delete'),
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                              ),
+                            ),
+                        ],
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            onEditEntry!(entry.key, entry.value);
+                          } else if (value == 'delete') {
+                            onDeleteEntry!(entry.key);
+                          }
+                        },
                       ),
-                    ],
-                    if (onDeleteEntry != null) ...[
-                      SizedBox(
-                        width: 30,
-                        height: 30,
-                        child: IconButton(
-                          onPressed: () => onDeleteEntry!(entry.key),
-                          icon: const Icon(Icons.delete_outline, size: 14),
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                          tooltip: 'Delete entry',
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -3407,6 +3535,42 @@ class _GoalProgressLogCard extends StatelessWidget {
                         color: Theme.of(context).colorScheme.outline,
                       ),
                     ),
+                    if (onEditNoDateEntry != null ||
+                        onDeleteNoDateEntry != null)
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        padding: EdgeInsets.zero,
+                        tooltip: 'Options',
+                        itemBuilder: (context) => [
+                          if (onEditNoDateEntry != null)
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                leading: Icon(Icons.edit_outlined),
+                                title: Text('Edit'),
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                              ),
+                            ),
+                          if (onDeleteNoDateEntry != null)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                leading: Icon(Icons.delete_outline),
+                                title: Text('Delete'),
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                              ),
+                            ),
+                        ],
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            onEditNoDateEntry!(bootstrapAmount);
+                          } else if (value == 'delete') {
+                            onDeleteNoDateEntry!();
+                          }
+                        },
+                      ),
                   ],
                 ),
               ),
