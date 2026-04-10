@@ -8,3 +8,4 @@ Add 1 Point When User Update/Create Goal (Once in a hour)
   5. Add option to input Goal completion in previous date but do not incourage user. Add extra step to find the option.
 
   Add an optional “initial completed units” input to the Simple Goal creation flow so users can bootstrap progress at creation time, without counting that entry as today’s heatmap progress.
+    6. In First input of a Tracked item in a Goal Make date optional for input but user can attatch date also.

@@ -326,6 +326,7 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
             goalId: goalId,
             delta: result.delta,
             atDateUtc: result.atDateUtc,
+            excludeFromHeatmap: result.excludeFromHeatmap,
           );
     } catch (e) {
       if (!context.mounted) {
@@ -450,12 +451,6 @@ class GoalDetailScreen extends ConsumerWidget {
                       const _CompletionCelebrationCard(),
                     ],
                     _GoalSummaryCard(goal: goal, metrics: metrics),
-                    const SizedBox(height: 12),
-                    _SimpleGoalProgressCard(
-                      goal: goal,
-                      onAddProgress: () =>
-                          _addSimpleProgress(context, ref, goal.id),
-                    ),
                     const SizedBox(height: 12),
                     _GoalHeatmapCard(dailyProgress: dailyProgress),
                     const SizedBox(height: 12),
@@ -751,6 +746,7 @@ class GoalDetailScreen extends ConsumerWidget {
             goalId: goalId,
             delta: result.delta,
             atDateUtc: result.atDateUtc,
+            excludeFromHeatmap: result.excludeFromHeatmap,
           );
     } catch (e) {
       if (!context.mounted) {
@@ -1488,55 +1484,6 @@ _StreakInfo _calculateStreak(Map<DateTime, double> dailyProgress) {
   return _StreakInfo(current: current, longest: longest);
 }
 
-class _SimpleGoalProgressCard extends StatelessWidget {
-  const _SimpleGoalProgressCard({
-    required this.goal,
-    required this.onAddProgress,
-  });
-
-  final Goal goal;
-  final VoidCallback onAddProgress;
-
-  @override
-  Widget build(BuildContext context) {
-    final unit = _goalUnitLabel(goal);
-    final remaining = (goal.targetValue - goal.completedValue)
-        .clamp(0.0, double.infinity)
-        .toDouble();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Quick Progress',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You can update this goal directly without adding items.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Remaining: ${_formatNumber(remaining)} $unit',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 10),
-            TextButton.icon(
-              onPressed: onAddProgress,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Progress'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _GoalHeatmapCard extends StatelessWidget {
   const _GoalHeatmapCard({required this.dailyProgress});
 
@@ -2113,9 +2060,14 @@ Future<double?> _showProgressUpdateDialog({
 }
 
 class _ProgressDialogResult {
-  const _ProgressDialogResult({required this.delta, this.atDateUtc});
+  const _ProgressDialogResult({
+    required this.delta,
+    this.atDateUtc,
+    this.excludeFromHeatmap = false,
+  });
   final double delta;
   final DateTime? atDateUtc;
+  final bool excludeFromHeatmap;
 }
 
 Future<_ProgressDialogResult?> _showAddProgressDialog({
@@ -2172,6 +2124,7 @@ class _AddProgressDialog extends StatefulWidget {
 class _AddProgressDialogState extends State<_AddProgressDialog> {
   final _controller = TextEditingController();
   bool _showDatePicker = false;
+  bool _excludeFromHeatmap = false;
   DateTime? _selectedDate;
 
   @override
@@ -2272,6 +2225,28 @@ class _AddProgressDialogState extends State<_AddProgressDialog> {
               ],
             ),
           ],
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Checkbox(
+                value: _excludeFromHeatmap,
+                visualDensity: VisualDensity.compact,
+                onChanged: (v) =>
+                    setState(() => _excludeFromHeatmap = v ?? false),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(
+                    () => _excludeFromHeatmap = !_excludeFromHeatmap,
+                  ),
+                  child: Text(
+                    'Exclude from heatmap',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       actions: [
@@ -2284,7 +2259,11 @@ class _AddProgressDialogState extends State<_AddProgressDialog> {
             final parsed = double.tryParse(_controller.text.trim());
             if (parsed == null || parsed <= 0) return;
             Navigator.of(context).pop(
-              _ProgressDialogResult(delta: parsed, atDateUtc: _selectedDate),
+              _ProgressDialogResult(
+                delta: parsed,
+                atDateUtc: _excludeFromHeatmap ? null : _selectedDate,
+                excludeFromHeatmap: _excludeFromHeatmap,
+              ),
             );
           },
           child: const Text('Add'),

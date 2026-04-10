@@ -180,6 +180,7 @@ class GoalRepository {
     required String goalId,
     required double delta,
     DateTime? atDateUtc, // null = today; supply a past date for backdating
+    bool excludeFromHeatmap = false,
   }) async {
     if (delta <= 0) {
       throw ArgumentError.value(
@@ -213,17 +214,18 @@ class GoalRepository {
           (goalData['completedValue'] as num?)?.toDouble() ?? 0;
       final nextCompleted = max(0.0, currentCompleted + delta);
       final appliedDelta = nextCompleted - currentCompleted;
-      final nextDailyProgress = _nextDailyProgressMap(
-        goalData: goalData,
-        dateLocal: heatmapDate,
-        delta: appliedDelta,
-      );
-
-      tx.update(goalRef, {
+      final goalUpdate = <String, dynamic>{
         'completedValue': nextCompleted,
         'updatedAtUtc': nowUtc.toIso8601String(),
-        'dailyProgressByDate': nextDailyProgress,
-      });
+      };
+      if (!excludeFromHeatmap) {
+        goalUpdate['dailyProgressByDate'] = _nextDailyProgressMap(
+          goalData: goalData,
+          dateLocal: heatmapDate,
+          delta: appliedDelta,
+        );
+      }
+      tx.update(goalRef, goalUpdate);
     });
   }
 

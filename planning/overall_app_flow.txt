@@ -22,7 +22,8 @@ Entire App  (max-width 600px on web · 420px native)
 │               ├── ⭐ pts badge · 🔥 streak badge (self only)
 │               └── expand → task list with status icons
 ├── Tab 1 · Goals (GoalDashboardScreen)  ← +1 pt on create/update (once/hr · animation)
-│   ├── GoalDetailScreen → heatmap (relative intensity) · Add Progress dialog (optional past date)
+│   ├── GoalDetailScreen → heatmap (relative intensity) · FAB: Add Progress
+│   │   ├── Add Progress dialog — amount · optional past date · exclude from heatmap checkbox
 │   │   ├── Progress Log — edit ✏️ / delete 🗑️ (confirm) per daily entry
 │   │   ├── Goal items — edit ✏️ / delete 🗑️ (confirm) per item
 │   │   └── Archive / Unarchive goal (soft-delete; history preserved)
@@ -46,15 +47,20 @@ Entire App  (max-width 600px on web · 420px native)
 -----Don't Update anything bellow this line------
 
 
+
+
 Current Problems and Solutions:
-  1. All Inputed Entry Can be modified (Update, Delete). Plan for it.
-  2. Add confirm dialog for all type of 'Delete' Buttons.
-  3. Implement Goal archiving — soft-delete completed goals instead of permanently deleting them, so the heatmap history is preserved and viewable later.
-  4. Implement Progress undo — let users delete a specific daily-progress entry from the Progress Log (currently there's no way to correct a mis-logged value).
-  5. Implement Heatmap intensity scale — make the darkest heatmap cell correspond to the user's personal daily best (instead of a fixed cap), so the colours are always meaningful relative to their own history.
-  6. In First input of a Tracked item in a Goal Make date optional for input but user can attatch date also.
-  7. Test everything you updated in code and comfirm updates are working properly.
-  8. Suggest next improvements and refining ideas.
+  1.  Simple Goal
+        "Quick Progress" card
+          "Add Progress" button
+        "Add Progress" (FAB)
+    
+    So "Quick Progress" card doesn't need. Remove it
+  
+  2. Plan for Showing Chart using https://pub.dev/packages/fl_chart Package. No code update. Only Plan and suggest for Debug/Developer test now.
+  3. Add option to Exclude Date when input Unit in Goal progress. If Exclude Date then Don't show this data on heatmap.
+  4. Test everything you updated in code and comfirm updates are working properly.
+  5. Suggest next improvements and refining ideas.
 
 
 
