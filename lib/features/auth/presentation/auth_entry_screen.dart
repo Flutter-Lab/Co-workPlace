@@ -1,4 +1,5 @@
 import 'package:coworkplace/features/auth/providers/auth_providers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -29,7 +30,9 @@ class _AuthEntryScreenState extends ConsumerState<AuthEntryScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
+            constraints: const BoxConstraints(
+              maxWidth: kIsWeb ? 400 : double.infinity,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -43,17 +46,17 @@ class _AuthEntryScreenState extends ConsumerState<AuthEntryScreen> {
                 Text(
                   _isCreateMode ? 'Create an account' : 'Welcome back',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF0F172A),
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0F172A),
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Enter your details to proceed.',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: const Color(0xFF64748B),
-                      ),
+                    color: const Color(0xFF64748B),
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
@@ -92,7 +95,9 @@ class _AuthEntryScreenState extends ConsumerState<AuthEntryScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : Text(_isCreateMode ? 'Create Account' : 'Sign In'),
+                              : Text(
+                                  _isCreateMode ? 'Create Account' : 'Sign In',
+                                ),
                         ),
                         const SizedBox(height: 8),
                         TextButton(
@@ -215,6 +220,8 @@ class _AuthEntryScreenState extends ConsumerState<AuthEntryScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

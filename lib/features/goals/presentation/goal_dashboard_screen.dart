@@ -56,7 +56,9 @@ class _GoalDashboardScreenState extends ConsumerState<GoalDashboardScreen> {
           ),
           body: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: kIsWeb ? 600 : 420),
+              constraints: const BoxConstraints(
+                maxWidth: kIsWeb ? 600 : double.infinity,
+              ),
               child: goalsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stackTrace) => Center(
